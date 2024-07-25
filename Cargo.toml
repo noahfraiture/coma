@@ -1,0 +1,13 @@
+[package]
+name = "coma"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+headless_chrome = { git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = [
+  "fetch",
+] }
+markup5ever = "0.12.1"
+scraper = "0.19.1"
+url = "2.5.2"
