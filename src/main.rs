@@ -45,6 +45,16 @@ fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
     }))
 }
 
+fn extract_text(page: &Html) -> Vec<node::Text> {
+    page.tree
+        .values()
+        .filter_map(|v| match v {
+            Node::Text(text) => Some(text.to_owned()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn browse_wikipedia() -> Result<(), Box<dyn Error>> {
     let browser = Browser::default()?;
 
@@ -61,9 +71,19 @@ fn browse_wikipedia() -> Result<(), Box<dyn Error>> {
     let html = response.get_content()?;
     let document = Html::parse_document(&html);
 
+    let comments = extract_comments(&document);
+    for comment in comments {
+        println!("{:#?}", comment);
+    }
+
     let links = extract_links(&url, &document);
     for link in links {
         println!("{:#?}", link.as_str());
+    }
+
+    let texts = extract_text(&document);
+    for text in texts {
+        println!("{:#?}", text);
     }
     Ok(())
 }
