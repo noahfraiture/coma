@@ -3,9 +3,12 @@ use anyhow::{Error, Result};
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use colored::Colorize;
 use markup5ever::local_name;
 use scraper::{node, Html, Node};
 use url::Url;
+
+use crate::cli::Commands;
 
 pub fn extract_comments(page: &Html) -> Vec<node::Comment> {
     page.tree
@@ -60,46 +63,44 @@ pub struct Browser {
 }
 
 impl Browser {
-    pub fn new() -> Result<Browser, Error> {
+    // These functions are used in async context
+    // The separation of function is needed to send connection in async
+    // task, but the Html can't be sent accros async task
+    pub fn new_navigate(url: Url) -> Result<(Self, Url), Error> {
         let browser = headless_chrome::Browser::default()?;
         let tab = browser.new_tab()?;
-        Ok(Browser { browser, tab })
+        tab.navigate_to(url.as_str())?;
+        tab.wait_until_navigated()?;
+        Ok((Self { browser, tab }, url))
     }
 
-    pub fn get_document(&self, url: &Url) -> Result<Html, Error> {
-        let response = self.tab.navigate_to(url.as_str())?;
-        self.tab.wait_until_navigated()?;
-        let html = response.get_content()?;
-        Ok(Html::parse_document(&html))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn browse_arc() {
-        let url_str = "https://arc.net/downloaded";
-        let url = url::Url::parse(url_str).unwrap();
-        let browser = Browser::new().unwrap();
-
-        let document = browser.get_document(&url).unwrap();
-
-        let links = extract_links(&url, &document);
-        for link in links {
-            println!("{:#?}", link.as_str());
-        }
-
-        let comments = extract_comments(&document);
-        for comment in comments {
-            println!("{:#?}", comment);
-        }
-
-        let texts = extract_texts(&document);
-        for text in texts {
-            println!("{:#?}", text);
-        }
+    pub fn parse_document(self, cmd: Commands, url: &Url) -> HashSet<Url> {
+        // NOTE: could refactor to dellocate this
+        let response = self.tab.get_content().unwrap();
+        let document = Html::parse_document(&response);
+        let links = extract_links(url, &document);
+        match cmd {
+            Commands::Texts => {
+                let texts = extract_texts(&document);
+                // println!("Found {} texts", texts.len().to_string().green());
+                // for text in texts {
+                //     println!("{:#?}", text);
+                // }
+            }
+            Commands::Comments => {
+                let comments = extract_comments(&document);
+                // println!("Found {} comments", comments.len().to_string().green());
+                // for comment in comments {
+                //     println!("{:#?}", comment);
+                // }
+            }
+            Commands::Links => {
+                // println!("Found {} links", links.len().to_string().green());
+                // for link in &links {
+                //     println!("{:#?}", link.as_str());
+                // }
+            }
+        };
+        links
     }
 }
