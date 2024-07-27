@@ -28,7 +28,7 @@ pub struct Args {
 }
 
 // TODO : add topology
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Subcommand, Debug, Clone, Copy)]
 pub enum Commands {
     /// Extract the text in the html
     Texts,

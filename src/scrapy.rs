@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 use anyhow::{Error, Result};
+use std::collections::HashSet;
 use std::sync::Arc;
-use std::thread;
-use std::{collections::HashSet, time};
 
 use markup5ever::local_name;
 use scraper::{node, Html, Node};
@@ -68,8 +67,8 @@ impl Browser {
     }
 
     pub fn get_document(&self, url: &Url) -> Result<Html, Error> {
-        let response = self.tab.navigate_to(url.as_str())?; // FIXME : must wait
-        thread::sleep(time::Duration::from_secs(3));
+        let response = self.tab.navigate_to(url.as_str())?;
+        self.tab.wait_until_navigated()?;
         let html = response.get_content()?;
         Ok(Html::parse_document(&html))
     }
