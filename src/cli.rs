@@ -21,6 +21,10 @@ pub struct Args {
     /// Url to start the search
     #[arg(short, long)]
     pub url: String,
+
+    /// Depth to search from the given url, 0 for only the current url, < 0 for infinite depth
+    #[arg(short, long, default_value_t = 0)]
+    pub depth: i32,
 }
 
 // TODO : add topology

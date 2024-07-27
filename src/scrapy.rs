@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 use anyhow::{Error, Result};
+use std::sync::Arc;
 use std::thread;
 use std::{collections::HashSet, time};
 
-use headless_chrome::Browser;
-use headless_chrome::Tab;
 use markup5ever::local_name;
 use scraper::{node, Html, Node};
 use url::Url;
@@ -39,6 +38,7 @@ pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
             }
 
             // I don't think this should ever happen
+            println!("{:#?}", element);
             unreachable!()
         }
         _ => None,
@@ -55,31 +55,38 @@ pub fn extract_texts(page: &Html) -> Vec<node::Text> {
         .collect()
 }
 
-pub fn get_document(tab: &Tab, url: &Url) -> Result<Html, Error> {
-    let response = tab.navigate_to(url.as_str())?; // FIXME
-    thread::sleep(time::Duration::from_secs(3));
-    let html = response.get_content()?;
-    Ok(Html::parse_document(&html))
+pub struct Browser {
+    browser: headless_chrome::Browser,
+    pub tab: Arc<headless_chrome::Tab>,
+}
+
+impl Browser {
+    pub fn new() -> Result<Browser, Error> {
+        let browser = headless_chrome::Browser::default()?;
+        let tab = browser.new_tab()?;
+        Ok(Browser { browser, tab })
+    }
+
+    pub fn get_document(&self, url: &Url) -> Result<Html, Error> {
+        let response = self.tab.navigate_to(url.as_str())?; // FIXME : must wait
+        thread::sleep(time::Duration::from_secs(3));
+        let html = response.get_content()?;
+        Ok(Html::parse_document(&html))
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use std::{thread, time};
 
     #[test]
     fn browse_arc() {
         let url_str = "https://arc.net/downloaded";
         let url = url::Url::parse(url_str).unwrap();
-        let browser = Browser::default().unwrap();
-        let tab = browser.new_tab().unwrap();
+        let browser = Browser::new().unwrap();
 
-        let response = tab.navigate_to(url_str).unwrap();
-        thread::sleep(time::Duration::from_secs(3));
-
-        let html = response.get_content().unwrap();
-        let document = scraper::Html::parse_document(&html);
+        let document = browser.get_document(&url).unwrap();
 
         let links = extract_links(&url, &document);
         for link in links {
