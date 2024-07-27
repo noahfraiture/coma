@@ -49,17 +49,20 @@ fn main() {
             match args.cmd {
                 Commands::Texts => {
                     let texts = scrapy::extract_texts(&document);
+                    println!("Found {} texts", texts.len().to_string().green());
                     for text in texts {
                         println!("{:#?}", text);
                     }
                 }
                 Commands::Comments => {
                     let comments = scrapy::extract_comments(&document);
+                    println!("Found {} comments", comments.len().to_string().green());
                     for comment in comments {
                         println!("{:#?}", comment);
                     }
                 }
                 Commands::Links => {
+                    println!("Found {} links", links.len().to_string().green());
                     for link in &links {
                         println!("{:#?}", link.as_str());
                     }
@@ -69,12 +72,13 @@ fn main() {
             // We extend here because the urls.extends move the links
             if let Some(next_depth) = urls_list.front() {
                 next_depth.borrow_mut().extend(links);
+            } else {
+                urls_list.push_back(RefCell::new(links.into_iter().collect()));
             }
-
-            if depth == 0 {
-                break;
-            }
-            depth -= 1;
         }
+        if depth == 0 {
+            break;
+        }
+        depth -= 1;
     }
 }

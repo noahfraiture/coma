@@ -23,7 +23,7 @@ pub struct Args {
     pub url: String,
 
     /// Depth to search from the given url, 0 for only the current url, < 0 for infinite depth
-    #[arg(short, long, default_value_t = 0)]
+    #[arg(short, long, default_value_t = 0, allow_negative_numbers = true)]
     pub depth: i32,
 }
 
