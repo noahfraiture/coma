@@ -1,14 +1,25 @@
 #![allow(dead_code)]
-use anyhow::{Error, Result};
-use std::collections::HashSet;
+use anyhow::{Context, Error, Result};
 use std::sync::Arc;
+use std::{collections::HashSet, fs::File, io::{copy, Cursor}};
 
 use colored::Colorize;
 use markup5ever::local_name;
+use reqwest;
 use scraper::{node, Html, Node};
 use url::Url;
 
 use crate::cli::Commands;
+
+// TODO : add async
+async fn download_img(url: &Url) -> Result<()> {
+    let (_, file_name) = url.path().rsplit_once("/").context("error on split")?;
+    let response = reqwest::get(url.as_str()).await?;
+    let mut file = File::create(file_name)?;
+    let mut content = Cursor::new(response.bytes().await?);
+    copy(&mut content, &mut file)?;
+    Ok(())
+}
 
 pub fn extract_comments(page: &Html) -> Vec<node::Comment> {
     page.tree
@@ -20,6 +31,7 @@ pub fn extract_comments(page: &Html) -> Vec<node::Comment> {
         .collect()
 }
 
+// TODO: here hashset but other vector, should harmonized that
 pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
     HashSet::from_iter(page.tree.values().filter_map(|v| match v {
         Node::Element(element) => {
@@ -57,6 +69,36 @@ pub fn extract_texts(page: &Html) -> Vec<node::Text> {
         .collect()
 }
 
+pub fn extract_images(url: &Url, page: &Html) -> Vec<Url> {
+    page.tree
+        .values()
+        .filter_map(|v| match v {
+            Node::Element(element) => {
+                let element = element.to_owned();
+
+                // Ensure this is a link
+                if !matches!(element.name.local, local_name!("img")) {
+                    return None;
+                }
+
+                // We want the attribute "href"
+                for (key, value) in &element.attrs {
+                    if matches!(key.local, local_name!("src")) {
+                        // TODO: add errors
+                        // If the url is absolute, the value will replace the base url
+                        return Url::join(url, value).ok();
+                    }
+                }
+
+                // I don't think this should ever happen
+                println!("{:#?}", element);
+                unreachable!()
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 pub struct Browser {
     browser: headless_chrome::Browser,
     pub tab: Arc<headless_chrome::Tab>,
@@ -74,7 +116,7 @@ impl Browser {
         Ok((Self { browser, tab }, url))
     }
 
-    pub fn parse_document(self, cmd: Commands, url: &Url) -> HashSet<Url> {
+    pub async fn parse_document(self, cmd: Commands, url: &Url) -> HashSet<Url> {
         // NOTE: could refactor to dellocate this
         let response = self.tab.get_content().unwrap();
         let document = Html::parse_document(&response);
@@ -82,23 +124,30 @@ impl Browser {
         match cmd {
             Commands::Texts => {
                 let texts = extract_texts(&document);
-                // println!("Found {} texts", texts.len().to_string().green());
-                // for text in texts {
-                //     println!("{:#?}", text);
-                // }
+                println!("Found {} texts", texts.len().to_string().green());
+                for text in texts {
+                    println!("{:#?}", text);
+                }
             }
             Commands::Comments => {
                 let comments = extract_comments(&document);
-                // println!("Found {} comments", comments.len().to_string().green());
-                // for comment in comments {
-                //     println!("{:#?}", comment);
-                // }
+                println!("Found {} comments", comments.len().to_string().green());
+                for comment in comments {
+                    println!("{:#?}", comment);
+                }
+            }
+            Commands::Images => {
+                let images = extract_images(url, &document);
+                println!("Found {} images", images.len().to_string().green());
+                for image in images {
+                    download_img(&image).await.unwrap();
+                }
             }
             Commands::Links => {
-                // println!("Found {} links", links.len().to_string().green());
-                // for link in &links {
-                //     println!("{:#?}", link.as_str());
-                // }
+                println!("Found {} links", links.len().to_string().green());
+                for link in &links {
+                    println!("{:#?}", link.as_str());
+                }
             }
         };
         links

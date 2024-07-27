@@ -38,6 +38,9 @@ pub enum Commands {
 
     /// Extract the links found on the page
     Links,
+
+    /// Extract the images of the page
+    Images,
 }
 
 pub fn args() -> Args {

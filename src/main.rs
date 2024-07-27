@@ -8,8 +8,6 @@ mod cli;
 mod scrapy;
 mod state;
 
-
-
 async fn run() {
     let mut state = state::State::new();
     while state.pop_layer().is_some() {
@@ -34,9 +32,8 @@ async fn run() {
         while let Some(res) = handles.join_next().await {
             println!("Time : {}", Local::now());
             let (browser, url) = res.unwrap().unwrap();
-            let links = browser.parse_document(state.cmd, &url);
+            let links = browser.parse_document(state.cmd, &url).await;
             state.add_to_next_layer(links);
-            
         }
         if state.bottom() {
             break;
