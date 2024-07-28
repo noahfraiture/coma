@@ -29,6 +29,11 @@ pub struct Args {
     /// Upper bound in the url, any url that doesn't contains this string will be ignored
     #[arg(short, long, default_value = "")]
     pub bound: String,
+
+    /// Max number of concurrent asynchronous call
+    // Not actually thread
+    #[arg(short, long, default_value_t = 5)]
+    pub thread: u32,
 }
 
 // TODO : add topology

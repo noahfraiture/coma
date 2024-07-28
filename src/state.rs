@@ -13,6 +13,7 @@ pub struct State {
     visited: HashSet<String>,
     layers: LinkedList<Mutex<Vec<Url>>>,
     current_layer: Mutex<Vec<Url>>,
+    pub thread: u32,
 }
 
 impl State {
@@ -26,8 +27,8 @@ impl State {
         let domain = origin_url.domain().unwrap().to_owned();
 
         let bound = args.bound;
-
         let depth = args.depth;
+        let thread = args.thread;
         let visited: HashSet<String> = HashSet::new();
 
         // Queue of vector of the discovered link at the current depth
@@ -43,6 +44,7 @@ impl State {
             domain,
             bound,
             depth,
+            thread,
             visited,
             layers,
             current_layer,

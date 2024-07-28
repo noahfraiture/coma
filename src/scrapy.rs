@@ -5,7 +5,6 @@ use std::{collections::HashSet, fs::File, io::{copy, Cursor}};
 
 use colored::Colorize;
 use markup5ever::local_name;
-use reqwest;
 use scraper::{node, Html, Node};
 use url::Url;
 
@@ -13,9 +12,11 @@ use crate::cli::Commands;
 
 // TODO : add async
 async fn download_img(url: &Url) -> Result<()> {
-    let (_, file_name) = url.path().rsplit_once("/").context("error on split")?;
+    let (_, file_name) = url.path().rsplit_once('/').context("error on split")?;
     let response = reqwest::get(url.as_str()).await?;
     let mut file = File::create(file_name)?;
+
+    // The file is a jpg or else
     let mut content = Cursor::new(response.bytes().await?);
     copy(&mut content, &mut file)?;
     Ok(())
@@ -135,7 +136,7 @@ impl Browser {
                 println!("Found {} images", images.len().to_string().green());
                 for image in images {
                     // TODO take care of error
-                    download_img(&image).await;
+                    let _ = download_img(&image).await;
                 }
             }
             Commands::Links => {

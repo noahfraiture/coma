@@ -1,5 +1,5 @@
 use colored::Colorize;
-use tokio::task::JoinSet;
+use tokio::{sync::Semaphore, task::JoinSet};
 use chrono::Local;
 
 use crate::scrapy::Browser;
@@ -8,8 +8,11 @@ mod cli;
 mod scrapy;
 mod state;
 
+static PERMITS: Semaphore = Semaphore::const_new(0);
+
 async fn run() {
     let mut state = state::State::new();
+    PERMITS.add_permits(state.thread as usize);
     while state.pop_layer().is_some() {
         let mut handles = JoinSet::new();
         println!("=== New layer ===");
@@ -21,8 +24,10 @@ async fn run() {
                 continue;
             }
 
+            let permit = PERMITS.acquire().await.unwrap();
             println!("Visiting {}", url.as_str().green());
-            handles.spawn(async {
+            handles.spawn(async move {
+                let _permit = permit;
                 Browser::new_navigate(url)
             });
 
