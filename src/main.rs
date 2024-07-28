@@ -17,7 +17,7 @@ async fn run() {
         // Connect
         while let Some(url) = state.next_url() {
             // TODO: remove unwrap
-            if !state.same_domain(&url).unwrap() || state.known(&url) {
+            if !state.same_domain(&url).unwrap() || state.known(&url) || !state.in_bound(&url) {
                 continue;
             }
 

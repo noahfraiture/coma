@@ -50,10 +50,7 @@ pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
                     return Url::join(url, value).ok();
                 }
             }
-
-            // I don't think this should ever happen
-            println!("{:#?}", element);
-            unreachable!()
+            None
         }
         _ => None,
     }))
@@ -89,10 +86,7 @@ pub fn extract_images(url: &Url, page: &Html) -> Vec<Url> {
                         return Url::join(url, value).ok();
                     }
                 }
-
-                // I don't think this should ever happen
-                println!("{:#?}", element);
-                unreachable!()
+                None
             }
             _ => None,
         })
@@ -140,7 +134,8 @@ impl Browser {
                 let images = extract_images(url, &document);
                 println!("Found {} images", images.len().to_string().green());
                 for image in images {
-                    download_img(&image).await.unwrap();
+                    // TODO take care of error
+                    download_img(&image).await;
                 }
             }
             Commands::Links => {

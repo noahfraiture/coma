@@ -8,6 +8,7 @@ use url::Url;
 pub struct State {
     pub cmd: Commands,
     domain: String,
+    bound: String,
     depth: i32,
     visited: HashSet<String>,
     layers: LinkedList<Mutex<Vec<Url>>>,
@@ -24,6 +25,8 @@ impl State {
         let origin_url = Url::parse(&args.url).expect("Url provided is not valid");
         let domain = origin_url.domain().unwrap().to_owned();
 
+        let bound = args.bound;
+
         let depth = args.depth;
         let visited: HashSet<String> = HashSet::new();
 
@@ -38,6 +41,7 @@ impl State {
         State {
             cmd,
             domain,
+            bound,
             depth,
             visited,
             layers,
@@ -75,5 +79,9 @@ impl State {
 
     pub fn deeper(&mut self) {
         self.depth -= 1;
+    }
+
+    pub fn in_bound(&self, url: &Url) -> bool {
+        url.as_str().contains(&self.bound)
     }
 }

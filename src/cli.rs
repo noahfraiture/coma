@@ -25,6 +25,10 @@ pub struct Args {
     /// Depth to search from the given url, 0 for only the current url, < 0 for infinite depth
     #[arg(short, long, default_value_t = 0, allow_negative_numbers = true)]
     pub depth: i32,
+
+    /// Upper bound in the url, any url that doesn't contains this string will be ignored
+    #[arg(short, long, default_value = "")]
+    pub bound: String,
 }
 
 // TODO : add topology
