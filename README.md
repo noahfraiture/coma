@@ -57,7 +57,7 @@ To illustrate how Coma works, here are a few example commands:
 
 3. Scrape images from a webpage with specific URL filtering:
    ```
-   coma -u https://example.com -b example images
+   coma -u https://example.com/jobs -b example.com/jobs images
    ```
 
 4. Display the help menu:
@@ -78,7 +78,16 @@ There are different ways to represent this graph:
 - HTML page for a dynamic topology similar to what Neo4j provides.
 
 ### Commands 
-We could add more command options beyond the current selection, such as forms and proxy support.
+We could add more command options beyond the current selection:
+- Forms
+- Full html page
+- Regex patterns inside the texts with some useful preset
+
+### Options
+It's important to improve the usability of the tool with these options :
+- Output of different format, it would be useful to have csv, json and maybe more
+- Proxy
+- Cookies and header
 
 ## Conclusion
 Coma is a flexible and straightforward tool for anyone needing to scrape data from websites quickly. Users can easily customize their scraping experience through various commands and options, making it suitable for a wide range of web data extraction tasks.
