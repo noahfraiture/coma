@@ -1,4 +1,8 @@
+use core::fmt;
+
 use clap::{Parser, Subcommand};
+use colored::Colorize;
+use url::Url;
 
 /// Website scraper
 #[derive(Parser, Debug)]
@@ -52,6 +56,38 @@ pub enum Commands {
     Images,
 }
 
-pub fn args() -> Args {
-    Args::parse()
+pub enum ArgsError {
+    InvalidUrl(String),
+}
+
+impl ArgsError {
+    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArgsError::InvalidUrl(url) => write!(f, "{}: {}", "Invalid URL".red(), url),
+        }
+    }
+}
+
+impl fmt::Display for ArgsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl fmt::Debug for ArgsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl std::error::Error for ArgsError {}
+
+pub fn args() -> Result<Args, ArgsError> {
+    let args = Args::parse();
+
+    if let Err(e) = Url::parse(&args.url) {
+        Err(ArgsError::InvalidUrl(e.to_string()))
+    } else {
+        Ok(args)
+    }
 }

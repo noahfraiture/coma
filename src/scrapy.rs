@@ -1,7 +1,12 @@
 #![allow(dead_code)]
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
+use std::fmt;
 use std::sync::Arc;
-use std::{collections::HashSet, fs::File, io::{copy, Cursor}};
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{copy, Cursor},
+};
 
 use colored::Colorize;
 use markup5ever::local_name;
@@ -103,49 +108,83 @@ impl Browser {
     // These functions are used in async context
     // The separation of function is needed to send connection in async
     // task, but the Html can't be sent accros async task
-    pub fn new_navigate(url: Url) -> Result<(Self, Url), Error> {
+    pub fn new_navigate(url: &Url) -> Result<Self, ScrapyError> {
         let browser = headless_chrome::Browser::default()?;
         let tab = browser.new_tab()?;
         tab.navigate_to(url.as_str())?;
         tab.wait_until_navigated()?;
-        Ok((Self { browser, tab }, url))
+        Ok(Self { browser, tab })
     }
 
-    pub async fn parse_document(self, cmd: Commands, url: &Url) -> HashSet<Url> {
+    pub async fn parse_document(self, cmd: Commands, url: &Url) -> (HashSet<Url>, usize) {
         // NOTE: could refactor to dellocate this
         let response = self.tab.get_content().unwrap();
         let document = Html::parse_document(&response);
         let links = extract_links(url, &document);
+        let mut count = 0;
         match cmd {
             Commands::Texts => {
                 let texts = extract_texts(&document);
-                println!("Found {} texts", texts.len().to_string().green());
+                count += texts.len();
                 for text in texts {
                     println!("{:#?}", text);
                 }
             }
             Commands::Comments => {
                 let comments = extract_comments(&document);
-                println!("Found {} comments", comments.len().to_string().green());
+                count += comments.len();
                 for comment in comments {
                     println!("{:#?}", comment);
                 }
             }
             Commands::Images => {
                 let images = extract_images(url, &document);
-                println!("Found {} images", images.len().to_string().green());
+                count += images.len();
                 for image in images {
                     // TODO take care of error
                     let _ = download_img(&image).await;
                 }
             }
             Commands::Links => {
-                println!("Found {} links", links.len().to_string().green());
+                count += links.len();
                 for link in &links {
                     println!("{:#?}", link.as_str());
                 }
             }
         };
-        links
+        (links, count)
+    }
+}
+
+// NOTE: this is ok only because the browser is the only one using anyhow
+pub enum ScrapyError {
+    Browser(String),
+}
+
+impl ScrapyError {
+    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScrapyError::Browser(e) => write!(f, "{}: {}", "Browser error".red(), e),
+        }
+    }
+}
+
+impl fmt::Display for ScrapyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl fmt::Debug for ScrapyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl std::error::Error for ScrapyError {}
+
+impl From<anyhow::Error> for ScrapyError {
+    fn from(value: anyhow::Error) -> Self {
+        ScrapyError::Browser(value.to_string())
     }
 }
