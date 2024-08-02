@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anyhow::{Context, Result};
+use headless_chrome::LaunchOptionsBuilder;
 use std::fmt;
 use std::sync::Arc;
 use std::{
@@ -109,7 +110,12 @@ impl Browser {
     // The separation of function is needed to send connection in async
     // task, but the Html can't be sent accros async task
     pub fn new_navigate(url: &Url) -> Result<Self, ScrapyError> {
-        let browser = headless_chrome::Browser::default()?;
+        let browser = headless_chrome::Browser::new(
+            LaunchOptionsBuilder::default()
+                .headless(true)
+                .build()
+                .map_err(|e| ScrapyError::Browser(e.to_string()))?,
+        )?;
         let tab = browser.new_tab()?;
         tab.navigate_to(url.as_str())?;
         tab.wait_until_navigated()?;
