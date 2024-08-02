@@ -6,6 +6,7 @@ use crate::scrapy::Browser;
 use colored::Colorize;
 
 mod cli;
+mod graph;
 mod scrapy;
 mod state;
 

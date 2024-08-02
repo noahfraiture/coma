@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Directed Graph Visualization</title>
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .side-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 300px;
+      max-height: 80%;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+    }
+
+    .settings-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 300px;
+      max-height: 80%;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+    }
+
+    .node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+
+    .link {
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
+
+    .link-arrow {
+      fill: #999;
+    }
+
+    .node text {
+      pointer-events: none;
+      font-size: 10px;
+      font-family: sans-serif;
+    }
+
+    .tooltip {
+      position: absolute;
+      text-align: center;
+      width: 60px;
+      height: 28px;
+      padding: 2px;
+      font: 12px sans-serif;
+      background: lightsteelblue;
+      border: 0px;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <svg></svg>
+  <div class="settings-panel">
+    <h2>Settings</h2>
+    <label>
+      <input type="radio" name="linkType" value="unidirectional" checked>
+      Unidirectional Links
+    </label><br>
+    <label>
+      <input type="radio" name="linkType" value="bidirectional">
+      Bidirectional Links
+    </label>
+  </div>
+  <div class="side-panel">
+    <h2>Node Details</h2>
+    <div id="node-details">
+      <p>Click on a node to see more details.</p>
+    </div>
+  </div>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const svg = d3.select('svg');
+      let linkType = 'unidirectional';
+
+      fetch('/graph')
+        .then(response => response.json())
+        .then(data => {
+          const width = window.innerWidth;
+          const height = window.innerHeight;
+
+          // Define arrow markers
+          svg.append('defs').selectAll('marker')
+            .data(['end'])
+            .enter().append('marker')
+            .attr('id', d => `arrow-${d}`)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 15)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('class', 'link-arrow');
+
+          const simulation = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.edges).id(d => d.id))
+            .force('charge', d3.forceManyBody())
+            .force('center', d3.forceCenter(width / 2, height / 2));
+
+          let link = svg.append('g')
+            .attr('class', 'links')
+            .selectAll('line')
+            .data(data.edges)
+            .enter().append('line')
+            .attr('class', 'link');
+
+          const node = svg.append('g')
+            .attr('class', 'nodes')
+            .selectAll('g')
+            .data(data.nodes)
+            .enter().append('g');
+
+          node.append('circle')
+            .attr('class', 'node')
+            .attr('r', 5)
+            .call(d3.drag()
+              .on('start', dragstarted)
+              .on('drag', dragged)
+              .on('end', dragended))
+            .on('mouseover', handleMouseOver)
+            .on('mouseout', handleMouseOut)
+            .on('click', handleClick);
+
+          node.append('text')
+            .attr('x', 8)
+            .attr('y', 3)
+            .text(d => d.label);
+
+          node.append('title')
+            .text(d => d.label);
+
+          function updateLinks() {
+            if (linkType === 'unidirectional') {
+              link.attr('marker-end', 'url(#arrow-end)');
+            } else {
+              link.attr('marker-end', null); // Remove arrow for bidirectional
+            }
+          }
+
+          function redraw() {
+            link = svg.selectAll('.links line')
+              .data(data.edges);
+
+            link.enter().append('line')
+              .attr('class', 'link')
+              .merge(link)
+              .attr('marker-end', linkType === 'unidirectional' ? 'url(#arrow-end)' : null);
+
+            link.exit().remove();
+          }
+
+          simulation
+            .nodes(data.nodes)
+            .on('tick', ticked);
+
+          simulation.force('link')
+            .links(data.edges);
+
+          function ticked() {
+            link
+              .attr('x1', d => d.source.x)
+              .attr('y1', d => d.source.y)
+              .attr('x2', d => d.target.x)
+              .attr('y2', d => d.target.y);
+
+            node
+              .attr('transform', d => `translate(${d.x},${d.y})`);
+          }
+
+          function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          }
+
+          function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+          }
+
+          function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+          }
+
+          function handleMouseOver(event, d) {
+            d3.select(this).select('circle').attr('r', 10);
+            link.filter(l => l.source.id === d.id || l.target.id === d.id)
+              .attr('stroke', 'red')
+              .attr('stroke-width', 2);
+          }
+
+          function handleMouseOut(event, d) {
+            d3.select(this).select('circle').attr('r', 5);
+            link.filter(l => l.source.id === d.id || l.target.id === d.id)
+              .attr('stroke', '#999')
+              .attr('stroke-width', 1);
+          }
+
+          function handleClick(event, d) {
+            const details = document.getElementById('node-details');
+            details.innerHTML = `
+                            <h3>${d.label}</h3>
+                            <p>ID: ${d.id}</p>
+                            <p>More details about the node can go here.</p>
+                        `;
+          }
+
+          // Event listener for settings changes
+          document.querySelectorAll('input[name="linkType"]').forEach(input => {
+            input.addEventListener('change', () => {
+              linkType = document.querySelector('input[name="linkType"]:checked').value;
+              updateLinks();
+              redraw();
+            });
+          });
+
+          updateLinks();
+        });
+    });
+  </script>
+</body>
+
+</html>
