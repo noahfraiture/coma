@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use anyhow::{Context, Result};
-use headless_chrome::LaunchOptionsBuilder;
+use headless_chrome::LaunchOptions;
 use std::fmt;
 use std::sync::Arc;
 use std::{
@@ -111,8 +111,8 @@ impl Browser {
     // task, but the Html can't be sent accros async task
     pub fn new_navigate(url: &Url) -> Result<Self, ScrapyError> {
         let browser = headless_chrome::Browser::new(
-            LaunchOptionsBuilder::default()
-                .headless(true)
+            LaunchOptions::default_builder()
+                .devtools(false)
                 .build()
                 .map_err(|e| ScrapyError::Browser(e.to_string()))?,
         )?;

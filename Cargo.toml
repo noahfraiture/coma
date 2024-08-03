@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix-files = "0.6.6"
-actix-web = "4.8.0"
 anyhow = "1.0.86"
+askama = { version = "0.12.1", features = ["serde-json"] }
 chrono = "0.4.38"
 clap = { version = "4.5.11", features = ["derive"] }
 colored = "2.1.0"
@@ -17,5 +16,7 @@ markup5ever = "0.12.1"
 reqwest = { version = "0.12.5", features = ["blocking"] }
 scraper = "0.19.1"
 serde = { version = "1.0.204", features = ["derive", "rc"] }
+tempfile = "3.11.0"
 tokio = { version = "1.39.2", features = ["full"] }
 url = "2.5.2"
+webbrowser = "1.0.1"

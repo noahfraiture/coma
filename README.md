@@ -37,6 +37,8 @@ Coma includes several options to customize its behavior:
 - `-b, --bound <BOUND>`: Sets a filter to include only URLs containing a specific substring. This can be useful for limiting the scraping to a specific domain or section of a website. The default value is an empty string, meaning no filtering is applied.
   
 - `-t, --thread <THREAD>`: Sets the maximum number of concurrent asynchronous calls to be made during scraping. The default is set to `5`, which balances speed and performance without overwhelming the target server.
+
+- `-g, --graph`: Once the discovery have finished, your browser will open with an interactive topology
   
 - `-h, --help`: Prints the help menu for Coma, including usage instructions and command options.
   
@@ -68,6 +70,9 @@ To illustrate how Coma works, here are a few example commands:
 ## Plan for the Future
 
 ### Topology 
+
+In v0.2 the topolgy came but prety primitive, the previous objectives still stands.
+
 I aim to provide the complete topology of the website based on different heuristics:
 - Hierarchy of the website.
 - Discovery from the provided link using BFS (Breadth-First Search) and DFS (Depth-First Search).

@@ -1,39 +1,16 @@
-use actix_files::NamedFile;
-use actix_web::{web, App, HttpServer, Responder};
-use url::Url;
+use askama::Template;
 
+use colored::Colorize;
+use webbrowser;
+
+use crate::topology::Node;
 use serde::Serialize;
-use std::{
-    collections::{hash_set, HashSet},
-    sync::{Arc, Mutex, Weak},
-};
+use std::{collections::HashSet, fmt, fs, sync::Arc, thread, time::Duration};
 
-struct Node {
-    id: String,
-    url: Url,
-    // more infos
-    children: Mutex<Vec<Arc<Node>>>,
-    parents: Mutex<Vec<Weak<Node>>>,
-}
-
-impl Node {
-    fn new_arc(parent: Option<&Arc<Node>>, url: Url, id: String) -> Arc<Node> {
-        let node = Arc::new(Node {
-            url,
-            id,
-            children: Mutex::new(vec![]),
-            parents: Mutex::new(parent.map_or_else(Vec::new, |p| vec![Arc::downgrade(p)])),
-        });
-        if let Some(parent) = parent {
-            parent.add_child(&node);
-        };
-        node
-    }
-
-    // TODO : remove unwrap
-    fn add_child(&self, child: &Arc<Node>) {
-        self.children.lock().unwrap().push(Arc::clone(child))
-    }
+#[derive(Template)]
+#[template(path = "index.html")]
+struct GraphTemplate {
+    graph: Graph,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -65,65 +42,101 @@ struct GraphEdge {
     target: String,
 }
 
-fn from_root(node: &Node) -> Graph {
-    let (mut nodes, mut edges) = (HashSet::<GraphNode>::new(), HashSet::<GraphEdge>::new());
-    let graph_child = by_children(node);
-    let graph_parent = by_parents(node);
-    nodes.extend(graph_child.nodes);
-    nodes.extend(graph_parent.nodes);
-    edges.extend(graph_child.edges);
-    edges.extend(graph_parent.edges);
-    Graph { nodes, edges }
-}
-
-fn by_children(node: &Node) -> Graph {
-    let (mut nodes, mut edges) = (
-        HashSet::from([GraphNode::from_node(node)]),
-        HashSet::<GraphEdge>::new(),
-    );
-    for child in node.children.lock().unwrap().clone() {
-        edges.insert(GraphEdge {
-            source: node.id.clone(),
-            target: child.id.clone(),
-        });
-        let graph = by_children(&child);
-        println!("Nodes before : {:?}", nodes);
-        println!("graph : {:?}", graph.nodes);
-        nodes.extend(graph.nodes);
-        println!("Nodes after: {:?}", nodes);
-        edges.extend(graph.edges);
+impl Graph {
+    fn from_root(node: &Node) -> Self {
+        let (mut nodes, mut edges) = (HashSet::<GraphNode>::new(), HashSet::<GraphEdge>::new());
+        let graph_child = Graph::by_children(node);
+        let graph_parent = Graph::by_parents(node);
+        nodes.extend(graph_child.nodes);
+        nodes.extend(graph_parent.nodes);
+        edges.extend(graph_child.edges);
+        edges.extend(graph_parent.edges);
+        Graph { nodes, edges }
     }
-    Graph { nodes, edges }
-}
 
-fn by_parents(node: &Node) -> Graph {
-    let (mut nodes, mut edges) = (
-        HashSet::from([GraphNode::from_node(node)]),
-        HashSet::<GraphEdge>::new(),
-    );
-    for parent in node.parents.lock().unwrap().clone() {
-        if let Some(parent) = parent.upgrade() {
+    fn by_children(node: &Node) -> Self {
+        let (mut nodes, mut edges) = (
+            HashSet::from([GraphNode::from_node(node)]),
+            HashSet::<GraphEdge>::new(),
+        );
+        for child in node.children.lock().unwrap().clone() {
             edges.insert(GraphEdge {
                 source: node.id.clone(),
-                target: parent.id.clone(),
+                target: child.id.clone(),
             });
-            let graph = by_parents(&parent);
+            let graph = Graph::by_children(&child);
             nodes.extend(graph.nodes);
             edges.extend(graph.edges);
         }
+        Graph { nodes, edges }
     }
-    Graph { nodes, edges }
+
+    fn by_parents(node: &Node) -> Self {
+        let (mut nodes, mut edges) = (
+            HashSet::from([GraphNode::from_node(node)]),
+            HashSet::<GraphEdge>::new(),
+        );
+        for parent in node.parents.lock().unwrap().clone() {
+            if let Some(parent) = parent.upgrade() {
+                edges.insert(GraphEdge {
+                    source: node.id.clone(),
+                    target: parent.id.clone(),
+                });
+                let graph = Graph::by_parents(&parent);
+                nodes.extend(graph.nodes);
+                edges.extend(graph.edges);
+            }
+        }
+        Graph { nodes, edges }
+    }
 }
 
-async fn index() -> impl Responder {
-    NamedFile::open("static/index.html")
+pub async fn render(root: &Arc<Node>) -> Result<(), GraphError> {
+    let template = GraphTemplate {
+        graph: Graph::from_root(root),
+    };
+    let html = template.render().map_err(|e| GraphError(e.to_string()))?;
+    let mut temp_file_path = std::env::temp_dir();
+    temp_file_path.push(root.url.domain().unwrap().to_owned() + ".html");
+    fs::write(&temp_file_path, html).expect("Failed to write to named file");
+    let temp_file_path_str = temp_file_path.to_str().expect("Failed to get file path");
+    webbrowser::open(temp_file_path_str).expect("Failed to open in web browser");
+
+    // Give time for the browser to open and load the page
+    thread::sleep(Duration::from_secs(3));
+    fs::remove_file(temp_file_path).expect("Failed to delete the file");
+    Ok(())
 }
+
+pub struct GraphError(String);
+
+impl GraphError {
+    fn print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", "Graph error".red(), self.0)
+    }
+}
+
+impl fmt::Display for GraphError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl fmt::Debug for GraphError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print(f)
+    }
+}
+
+impl std::error::Error for GraphError {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{fs, sync::Arc, thread, time::Duration};
+    use url::Url;
 
-    async fn graph_example() -> impl Responder {
+    fn node_example() -> Arc<Node> {
         // pretty draw in static
         let url = Url::parse("http://google.com").unwrap();
         let t0 = Node::new_arc(None, url.clone(), String::from("0"));
@@ -147,26 +160,23 @@ mod tests {
         t02.add_child(&t022);
         t02.add_child(&t013);
 
-        let graph = from_root(&t0);
-        let x = web::Json(graph);
-        println!("{:#?}", x);
-        x
+        t0
     }
 
-    #[tokio::test]
-    async fn example() {
-        graph_example().await;
-    }
+    #[test]
+    fn generate_html() {
+        let node = node_example();
+        let graph = Graph::from_root(&node);
+        let template = GraphTemplate { graph };
+        let html = template.render().unwrap();
+        let mut temp_file_path = std::env::temp_dir();
+        temp_file_path.push(node.url.domain().unwrap().to_owned() + ".html");
+        fs::write(&temp_file_path, html).expect("Failed to write to named file");
+        let temp_file_path_str = temp_file_path.to_str().expect("Failed to get file path");
+        webbrowser::open(temp_file_path_str).expect("Failed to open in web browser");
 
-    #[tokio::test]
-    async fn run() -> std::io::Result<()> {
-        HttpServer::new(|| {
-            App::new()
-                .route("/", web::get().to(index))
-                .route("/graph", web::get().to(graph_example))
-        })
-        .bind("127.0.0.1:8080")?
-        .run()
-        .await
+        // Give time for the browser to open and load the page
+        thread::sleep(Duration::from_secs(3));
+        fs::remove_file(temp_file_path).expect("Failed to delete the file");
     }
 }

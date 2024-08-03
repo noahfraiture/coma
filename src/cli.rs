@@ -34,14 +34,17 @@ pub struct Args {
     #[arg(short, long, default_value = "")]
     pub bound: String,
 
-    /// Max number of concurrent asynchronous call
-    // Not actually thread
+    /// Max number of concurrent task
     #[arg(short, long, default_value_t = 5)]
-    pub thread: u32,
+    pub task: u32,
+
+    /// Display a graph in the browser
+    #[arg(short, long, default_value_t = false)]
+    pub graph: bool,
 }
 
 // TODO : add topology
-#[derive(Subcommand, Debug, Clone, Copy)]
+#[derive(Subcommand, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Commands {
     /// Extract the text in the html
     Texts,
