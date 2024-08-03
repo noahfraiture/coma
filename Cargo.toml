@@ -1,7 +1,16 @@
 [package]
 name = "coma"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+authors = ["Noah <pro@noahcode.dev>"]
+license = "MIT"
+description = "Coma is a lightweight command-line tool designed for crawling websites"
+repository = "https://github.com/noahfraiture/coma"
+readme = "README.md"
+
+keywords = ["scraping", "crawler", "web-discovery"]
+categories = ["web-programming"]
+exclude = ["static"]
 
 [dependencies]
 anyhow = "1.0.86"
@@ -9,9 +18,7 @@ askama = { version = "0.12.1", features = ["serde-json"] }
 chrono = "0.4.38"
 clap = { version = "4.5.11", features = ["derive"] }
 colored = "2.1.0"
-headless_chrome = { git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = [
-  "fetch",
-] }
+headless_chrome = { version = "1.0.12", features = ["fetch"] }
 markup5ever = "0.12.1"
 reqwest = { version = "0.12.5", features = ["blocking"] }
 scraper = "0.19.1"
