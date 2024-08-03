@@ -10,7 +10,6 @@ readme = "README.md"
 
 keywords = ["scraping", "crawler", "web-discovery"]
 categories = ["web-programming"]
-exclude = ["static"]
 
 [dependencies]
 anyhow = "1.0.86"

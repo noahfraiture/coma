@@ -3,7 +3,38 @@
 ## Overview
 Coma is a lightweight command-line tool designed for scraping various types of content from web pages, such as text, comments, links, and images. Its simplicity and flexibility make it easy for users to extract the specific data they need from a given URL.
 
-![Logo shrimp](shrimp.jpg)
+![Logo shrimp](static/shrimp.jpg)
+
+## Installation
+
+You can install Coma either by compiling it locally after cloning the repository or by installing it directly from [crates.io](https://crates.io).
+
+### Clone and Compile Locally
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/coma.git
+   cd coma
+   ```
+
+2. **Build the project using Cargo:**
+   ```bash
+   cargo build --release
+   ```
+
+3. **Run the compiled binary:**
+   ```bash
+   ./target/release/coma --help
+   ```
+
+### Install from crates.io
+
+To install Coma from crates.io, use the following command:
+```bash
+cargo install coma
+```
+
+This will download and compile Coma, making it available for easy use from the command line.
 
 ## Program Behavior
 
@@ -37,8 +68,8 @@ Coma includes several options to customize its behavior:
 - `-b, --bound <BOUND>`: Sets a filter to include only URLs containing a specific substring. This can be useful for limiting the scraping to a specific domain or section of a website. The default value is an empty string, meaning no filtering is applied.
   
 - `-t, --thread <THREAD>`: Sets the maximum number of concurrent asynchronous calls to be made during scraping. The default is set to `5`, which balances speed and performance without overwhelming the target server.
-
-- `-g, --graph`: Once the discovery have finished, your browser will open with an interactive topology
+  
+- `-g, --graph`: Once the discovery has finished, your browser will open with an interactive topology.
   
 - `-h, --help`: Prints the help menu for Coma, including usage instructions and command options.
   
@@ -48,30 +79,30 @@ Coma includes several options to customize its behavior:
 To illustrate how Coma works, here are a few example commands:
 
 1. Extract all text from a single web page:
-   ```
+   ```bash
    coma -u https://example.com texts
    ```
 
 2. Extract all links from a website while allowing for a depth of 1:
-   ```
+   ```bash
    coma -u https://example.com -d 1 links
    ```
 
 3. Scrape images from a webpage with specific URL filtering:
-   ```
+   ```bash
    coma -u https://example.com/jobs -b example.com/jobs images
    ```
 
 4. Display the help menu:
-   ```
+   ```bash
    coma help
    ```
 
 ## Plan for the Future
 
-### Topology 
+### Topology
 
-In v0.2 the topolgy came but prety primitive, the previous objectives still stands.
+In v0.2 the topology came but pretty primitive, the previous objectives still stand.
 
 I aim to provide the complete topology of the website based on different heuristics:
 - Hierarchy of the website.
@@ -82,15 +113,15 @@ There are different ways to represent this graph:
 - Image rendering in the terminal (covering various protocols, though not all terminals support them).
 - HTML page for a dynamic topology similar to what Neo4j provides.
 
-### Commands 
+### Commands
 We could add more command options beyond the current selection:
 - Forms
-- Full html page
+- Full HTML page
 - Regex patterns inside the texts with some useful preset
 
 ### Options
-It's important to improve the usability of the tool with these options :
-- Output of different format, it would be useful to have csv, json and maybe more
+It's important to improve the usability of the tool with these options:
+- Output of different formats, it would be useful to have CSV, JSON, and maybe more.
 - Proxy
 - Cookies and header
 
