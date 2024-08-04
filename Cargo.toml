@@ -17,6 +17,7 @@ askama = { version = "0.12.1", features = ["serde-json"] }
 chrono = "0.4.38"
 clap = { version = "4.5.11", features = ["derive"] }
 colored = "2.1.0"
+futures = "0.3.30"
 headless_chrome = { version = "1.0.12", features = ["fetch"] }
 markup5ever = "0.12.1"
 reqwest = { version = "0.12.5", features = ["blocking"] }

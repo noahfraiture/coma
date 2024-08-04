@@ -37,10 +37,6 @@ pub struct Args {
     /// Max number of concurrent task
     #[arg(short, long, default_value_t = 5)]
     pub task: u32,
-
-    /// Display a graph in the browser
-    #[arg(short, long, default_value_t = false)]
-    pub graph: bool,
 }
 
 // TODO : add topology
@@ -57,6 +53,9 @@ pub enum Commands {
 
     /// Extract the images of the page
     Images,
+
+    /// Extract all information and generate a topology
+    Graph,
 }
 
 pub enum ArgsError {

@@ -15,7 +15,6 @@ pub struct Config {
     pub target_depth: i32,
     pub thread: u32,
     pub root: Arc<Node>,
-    pub graph: bool,
 }
 
 impl Config {
@@ -38,7 +37,6 @@ impl Config {
             target_depth: args.depth,
             thread: args.task,
             root: Node::new_arc(None, origin_url, id),
-            graph: args.graph,
         })
     }
 

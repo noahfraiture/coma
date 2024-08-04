@@ -1,6 +1,7 @@
 use std::{process, sync::Arc};
 
 use crate::scrapy::Browser;
+use cli::Commands;
 use colored::Colorize;
 use scrapy::ScrapyError;
 use tokio::{sync::Semaphore, task::JoinSet};
@@ -35,7 +36,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!();
     }
 
-    if config.graph {
+    if config.cmd == Commands::Graph {
         graph::render(&config.root).await?;
     }
     Ok(())
@@ -74,13 +75,13 @@ async fn collect(
     let mut total_count = 0;
     while let Some(handle) = handles.join_next().await {
         let (browser, parent) = handle?;
-        let (links, quantity) = browser?.parse_document(config.cmd, &parent.url).await;
-        // TODO : find better id
+        let links = browser?.parse_document(config.cmd, &parent).await;
+        total_count += parent.quantity_elements() + links.len();
+
         let childs = links
             .into_iter()
             .map(|url| Node::new_arc(Some(&parent), url.clone(), url.to_string()))
             .collect();
-        total_count += quantity;
         state.add_to_next_layer(childs)?;
     }
     println!(
