@@ -23,6 +23,22 @@
       width: 100%;
       height: 100%;
     }
+
+    .image-grid-container {
+      max-height: 200px; /* Set a max height for the container */
+      overflow-y: auto; /* Enable vertical scrolling if needed */
+    }
+
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      gap: 5px;
+    }
+
+    .image-grid img {
+      width: 100%;
+      height: auto;
+    }
   </style>
 </head>
 
@@ -63,7 +79,6 @@
       svg.call(zoom);
 
       let linkType = 'unidirectional';
-
 
       const data = {{graph| json | safe}}
       const width = window.innerWidth;
@@ -163,7 +178,15 @@
 
       function handleClick(event, d) {
         const details = document.getElementById('node-details');
-        details.innerHTML = `<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">${d.label}</h3><p class="text-gray-800 dark:text-gray-300">ID: ${d.id}</p>`;
+        let imagesHtml = '';
+        if (d.images && d.images.length > 0) {
+          imagesHtml = '<div class="image-grid-container"><div class="image-grid">' + d.images.map(url => `<a href="${url}" target="_blank"><img src="${url}" alt="Image"></a>`).join('') + '</div></div>';
+        }
+        details.innerHTML = `
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">${d.label}</h3>
+          <p class="text-gray-800 dark:text-gray-300">ID: ${d.id}</p>
+          ${imagesHtml}
+        `;
       }
 
       updateLinks();
