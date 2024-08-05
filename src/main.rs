@@ -1,4 +1,7 @@
-use std::{process, sync::Arc};
+use std::{
+    process,
+    sync::{Arc, Mutex},
+};
 
 use crate::scrapy::Browser;
 use cli::Commands;
@@ -22,7 +25,7 @@ static PERMITS: Semaphore = Semaphore::const_new(0);
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new()?;
     let mut state = State::new(Arc::clone(&config.root))?;
-    println!("{:?}", config.root.url);
+    println!("{:?}", config.root.lock().unwrap().url);
     PERMITS.add_permits(config.thread as usize);
     while state.pop_layer().is_some() {
         println!("=== Depth {} ===", state.current_depth);
@@ -32,7 +35,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         if state.current_depth == config.target_depth {
             break;
         }
-        state.deeper();
+        state.current_depth += 1;
         println!();
     }
 
@@ -45,22 +48,22 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 async fn browse_layer(
     state: &mut State,
     config: &Config,
-) -> Result<JoinSet<(Result<Browser, ScrapyError>, Arc<Node>)>, Box<dyn std::error::Error>> {
+) -> Result<JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>, Box<dyn std::error::Error>> {
     let mut handles = JoinSet::new();
-    while let Some(node) = state.next_url()? {
-        if node.url.domain().is_none()
-            || !config.same_domain(&node.url)
+    while let Some(node) = state.current_layer.pop() {
+        if !config.same_domain(&node.lock().unwrap().url)
             || state.known(&node)
-            || !config.in_bound(&node.url)
+            || !config.in_bound(&node.lock().unwrap().url)
         {
             continue;
         }
 
         let permit = PERMITS.acquire().await?;
-        println!("Visiting {}", node.url.as_str().green());
+        println!("Visiting {}", node.lock().unwrap().url.as_str().green());
         handles.spawn(async move {
             let _permit = permit;
-            (Browser::new_navigate(&node.url), node)
+            let url = node.lock().unwrap().url.clone();
+            (Browser::new_navigate(&url), node)
         });
     }
     Ok(handles)
@@ -69,20 +72,34 @@ async fn browse_layer(
 async fn collect(
     state: &mut State,
     config: &Config,
-    handles: &mut JoinSet<(Result<Browser, ScrapyError>, Arc<Node>)>,
+    handles: &mut JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Collecting data from every url of the layer");
     let mut total_count = 0;
     while let Some(handle) = handles.join_next().await {
         let (browser, parent) = handle?;
-        let links = browser?.parse_document(config.cmd, &parent).await;
-        total_count += parent.quantity_elements() + links.len();
-
-        let childs = links
+        let mut explore_external = false;
+        let links = browser?
+            .parse_document(config.cmd, &parent)
+            .await
             .into_iter()
+            .filter(|link| {
+                if config.same_domain(link) {
+                    return true;
+                }
+                if state.current_external < config.target_external {
+                    explore_external = true;
+                    return true;
+                }
+                false
+            });
+        parent.lock().unwrap().explore();
+
+        let childs: Vec<Arc<Mutex<Node>>> = links
             .map(|url| Node::new_arc(Some(&parent), url.clone(), url.to_string()))
             .collect();
-        state.add_to_next_layer(childs)?;
+        total_count += parent.lock().unwrap().quantity_elements() + childs.len();
+        state.add_to_next_layer(childs);
     }
     println!(
         "Found a total of {} {:?}",

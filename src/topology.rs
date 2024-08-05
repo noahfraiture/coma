@@ -8,17 +8,19 @@ use crate::scrapy::crawl;
 pub struct Node {
     pub id: String,
     pub url: Url,
+    // TODO : should I move while Node behind of mutex instead of most field ?
+    pub explored: bool, // flag used to know if it will be rendered
     // Every node will own every images on the page
     // More logic that every node own a copy of the url to the image
 
     // Mutex is need to borrow mutability of Arc
-    pub images: Mutex<Vec<Url>>,
+    pub images: Vec<Url>,
     // Can't directly use scraper::node::{Comment, Text} since their aren't Send/Sync
     // Could try later to impl these trait
-    pub comments: Mutex<Vec<String>>,
-    pub texts: Mutex<Vec<String>>,
-    pub children: Mutex<Vec<Arc<Node>>>,
-    pub parents: Mutex<Vec<Weak<Node>>>,
+    pub comments: Vec<String>,
+    pub texts: Vec<String>,
+    pub children: Vec<Arc<Mutex<Node>>>,
+    pub parents: Vec<Weak<Mutex<Node>>>,
 }
 
 impl std::hash::Hash for Node {
@@ -37,36 +39,39 @@ impl PartialEq for Node {
 impl Eq for Node {}
 
 impl Node {
-    pub fn new_arc(parent: Option<&Arc<Node>>, url: Url, id: String) -> Arc<Node> {
-        let node = Arc::new(Node {
-            url,
+    pub fn new_arc(parent: Option<&Arc<Mutex<Node>>>, url: Url, id: String) -> Arc<Mutex<Node>> {
+        let node = Arc::new(Mutex::new(Node {
             id,
-            images: Mutex::new(Vec::new()),
-            comments: Mutex::new(Vec::new()),
-            texts: Mutex::new(Vec::new()),
-            children: Mutex::new(vec![]),
-            parents: Mutex::new(parent.map_or_else(Vec::new, |p| vec![Arc::downgrade(p)])),
-        });
+            url,
+            explored: false,
+            images: Vec::new(),
+            comments: Vec::new(),
+            texts: Vec::new(),
+            children: vec![],
+            parents: parent.map_or_else(Vec::new, |p| vec![Arc::downgrade(p)]),
+        }));
         if let Some(parent) = parent {
-            parent.add_child(&node);
+            parent.lock().unwrap().add_child(&node);
         };
         node
     }
 
     // TODO : remove unwrap
-    pub fn add_child(&self, child: &Arc<Node>) {
-        self.children.lock().unwrap().push(Arc::clone(child))
+    pub fn add_child(&mut self, child: &Arc<Mutex<Node>>) {
+        self.children.push(Arc::clone(child))
+    }
+
+    pub fn explore(&mut self) {
+        self.explored = true;
     }
 
     pub fn quantity_elements(&self) -> usize {
-        self.images.lock().unwrap().len()
-            + self.comments.lock().unwrap().len()
-            + self.texts.lock().unwrap().len()
+        self.images.len() + self.comments.len() + self.texts.len()
     }
 
     pub async fn handle_images(&self) {
         let mut tasks = Vec::new();
-        for image in self.images.lock().unwrap().iter().map(|v| v.to_owned()) {
+        for image in self.images.iter().map(|v| v.to_owned()) {
             let task = task::spawn(async move {
                 // TODO return error
                 crawl::download_img(&image).await.unwrap();
@@ -77,13 +82,13 @@ impl Node {
     }
 
     pub fn handle_comments(&self) {
-        for comment in self.comments.lock().unwrap().iter() {
+        for comment in self.comments.iter() {
             println!("{}", comment);
         }
     }
 
     pub fn handle_texts(&self) {
-        for text in self.texts.lock().unwrap().iter() {
+        for text in self.texts.iter() {
             println!("{}", text);
         }
     }

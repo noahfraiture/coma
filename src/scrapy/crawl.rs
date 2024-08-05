@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use headless_chrome::LaunchOptions;
-use std::sync::Arc;
 use std::{
     collections::HashSet,
     fs::File,
     io::{copy, Cursor},
+    sync::{Arc, Mutex},
 };
 
 use scraper::Html;
@@ -43,22 +43,26 @@ impl Browser {
         Ok(Self { browser, tab })
     }
 
-    pub async fn parse_document(self, cmd: Commands, parent: &Arc<topology::Node>) -> HashSet<Url> {
+    pub async fn parse_document(
+        self,
+        cmd: Commands,
+        parent: &Arc<Mutex<topology::Node>>,
+    ) -> HashSet<Url> {
         let response = self.tab.get_content().unwrap();
         let document = Html::parse_document(&response);
-        let links = extract::extract_links(&parent.url, &document);
+        let links = extract::extract_links(&parent.lock().unwrap().url, &document);
         match cmd {
             Commands::Texts => {
                 extract::extract_texts(parent, &document);
-                parent.handle_texts();
+                parent.lock().unwrap().handle_texts();
             }
             Commands::Comments => {
                 extract::extract_comments(parent, &document);
-                parent.handle_comments();
+                parent.lock().unwrap().handle_comments();
             }
             Commands::Images => {
                 extract::extract_images(parent, &document);
-                parent.handle_images().await;
+                parent.lock().unwrap().handle_images().await;
             }
             Commands::Links => {}
             Commands::Graph => {

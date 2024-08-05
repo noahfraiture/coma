@@ -37,6 +37,10 @@ pub struct Args {
     /// Max number of concurrent task
     #[arg(short, long, default_value_t = 5)]
     pub task: u32,
+
+    // Depth to external website with different domain. Depth have priority to stop the search
+    #[arg(short, long, default_value_t = 0)]
+    pub external: i32,
 }
 
 // TODO : add topology
@@ -87,9 +91,11 @@ impl std::error::Error for ArgsError {}
 pub fn args() -> Result<Args, ArgsError> {
     let args = Args::parse();
 
-    if let Err(e) = Url::parse(&args.url) {
-        Err(ArgsError::InvalidUrl(e.to_string()))
-    } else {
-        Ok(args)
+    match Url::parse(&args.url) {
+        Ok(v) => {
+            v.domain().ok_or(ArgsError::InvalidUrl(v.to_string()))?;
+            Ok(args)
+        }
+        Err(e) => Err(ArgsError::InvalidUrl(e.to_string())),
     }
 }

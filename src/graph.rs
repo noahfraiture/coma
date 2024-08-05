@@ -1,11 +1,14 @@
 use askama::Template;
 
 use colored::Colorize;
-use webbrowser;
 
 use crate::topology::Node;
 use serde::Serialize;
-use std::{collections::HashSet, fmt, fs, sync::Arc, thread, time::Duration};
+use std::{
+    collections::HashSet,
+    fmt, fs,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -25,6 +28,8 @@ struct Graph {
 struct GraphNode {
     id: String,
     label: String,
+    images: Vec<String>,
+    comments: Vec<String>,
 }
 
 impl GraphNode {
@@ -32,6 +37,8 @@ impl GraphNode {
         Self {
             id: node.id.clone(),
             label: node.url.to_string(),
+            images: node.images.iter().map(|url| url.to_string()).collect(),
+            comments: node.comments.iter().map(|com| com.to_string()).collect(),
         }
     }
 }
@@ -59,12 +66,15 @@ impl Graph {
             HashSet::from([GraphNode::from_node(node)]),
             HashSet::<GraphEdge>::new(),
         );
-        for child in node.children.lock().unwrap().clone() {
+        for child in node.children.clone() {
+            if !child.lock().unwrap().explored {
+                continue;
+            }
             edges.insert(GraphEdge {
                 source: node.id.clone(),
-                target: child.id.clone(),
+                target: child.lock().unwrap().id.clone(),
             });
-            let graph = Graph::by_children(&child);
+            let graph = Graph::by_children(&child.lock().unwrap());
             nodes.extend(graph.nodes);
             edges.extend(graph.edges);
         }
@@ -76,13 +86,16 @@ impl Graph {
             HashSet::from([GraphNode::from_node(node)]),
             HashSet::<GraphEdge>::new(),
         );
-        for parent in node.parents.lock().unwrap().clone() {
+        for parent in node.parents.clone() {
             if let Some(parent) = parent.upgrade() {
+                if !parent.lock().unwrap().explored {
+                    unreachable!("Parent has not been explored") // debug purpose
+                }
                 edges.insert(GraphEdge {
                     source: node.id.clone(),
-                    target: parent.id.clone(),
+                    target: parent.lock().unwrap().id.clone(),
                 });
-                let graph = Graph::by_parents(&parent);
+                let graph = Graph::by_parents(&parent.lock().unwrap());
                 nodes.extend(graph.nodes);
                 edges.extend(graph.edges);
             }
@@ -91,20 +104,16 @@ impl Graph {
     }
 }
 
-pub async fn render(root: &Arc<Node>) -> Result<(), GraphError> {
+pub async fn render(root: &Arc<Mutex<Node>>) -> Result<(), GraphError> {
     let template = GraphTemplate {
-        graph: Graph::from_root(root),
+        graph: Graph::from_root(&root.lock().unwrap()),
     };
     let html = template.render().map_err(|e| GraphError(e.to_string()))?;
     let mut temp_file_path = std::env::temp_dir();
-    temp_file_path.push(root.url.domain().unwrap().to_owned() + ".html");
+    temp_file_path.push(root.lock().unwrap().url.domain().unwrap().to_owned() + ".html");
     fs::write(&temp_file_path, html).expect("Failed to write to named file");
     let temp_file_path_str = temp_file_path.to_str().expect("Failed to get file path");
     webbrowser::open(temp_file_path_str).expect("Failed to open in web browser");
-
-    // Give time for the browser to open and load the page
-    thread::sleep(Duration::from_secs(3));
-    fs::remove_file(temp_file_path).expect("Failed to delete the file");
     Ok(())
 }
 
@@ -129,54 +138,3 @@ impl fmt::Debug for GraphError {
 }
 
 impl std::error::Error for GraphError {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{fs, sync::Arc, thread, time::Duration};
-    use url::Url;
-
-    fn node_example() -> Arc<Node> {
-        // pretty draw in static
-        let url = Url::parse("http://google.com").unwrap();
-        let t0 = Node::new_arc(None, url.clone(), String::from("0"));
-
-        let t01 = Node::new_arc(Some(&t0), url.clone(), String::from("1"));
-        t0.add_child(&t01);
-        let t02 = Node::new_arc(Some(&t0), url.clone(), String::from("2"));
-        t0.add_child(&t02);
-
-        let t011 = Node::new_arc(Some(&t01), url.clone(), String::from("3"));
-        t01.add_child(&t011);
-        t0.add_child(&t011);
-
-        let t012 = Node::new_arc(Some(&t01), url.clone(), String::from("4"));
-        t01.add_child(&t012);
-
-        let t013 = Node::new_arc(Some(&t01), url.clone(), String::from("5"));
-        t01.add_child(&t013);
-
-        let t022 = Node::new_arc(Some(&t02), url.clone(), String::from("6"));
-        t02.add_child(&t022);
-        t02.add_child(&t013);
-
-        t0
-    }
-
-    #[test]
-    fn generate_html() {
-        let node = node_example();
-        let graph = Graph::from_root(&node);
-        let template = GraphTemplate { graph };
-        let html = template.render().unwrap();
-        let mut temp_file_path = std::env::temp_dir();
-        temp_file_path.push(node.url.domain().unwrap().to_owned() + ".html");
-        fs::write(&temp_file_path, html).expect("Failed to write to named file");
-        let temp_file_path_str = temp_file_path.to_str().expect("Failed to get file path");
-        webbrowser::open(temp_file_path_str).expect("Failed to open in web browser");
-
-        // Give time for the browser to open and load the page
-        thread::sleep(Duration::from_secs(3));
-        fs::remove_file(temp_file_path).expect("Failed to delete the file");
-    }
-}

@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 
 use markup5ever::local_name;
 use scraper::Html;
@@ -29,9 +32,8 @@ pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
     }))
 }
 
-pub fn extract_comments(node: &Arc<topology::Node>, page: &Html) {
-    let mut comments = node.comments.lock().unwrap();
-    *comments = page
+pub fn extract_comments(node: &Arc<Mutex<topology::Node>>, page: &Html) {
+    node.lock().unwrap().comments = page
         .tree
         .values()
         .filter_map(|v| match v {
@@ -41,9 +43,8 @@ pub fn extract_comments(node: &Arc<topology::Node>, page: &Html) {
         .collect();
 }
 
-pub fn extract_texts(node: &Arc<topology::Node>, page: &Html) {
-    let mut texts = node.texts.lock().unwrap();
-    *texts = page
+pub fn extract_texts(node: &Arc<Mutex<topology::Node>>, page: &Html) {
+    node.lock().unwrap().texts = page
         .tree
         .values()
         .filter_map(|v| match v {
@@ -53,9 +54,8 @@ pub fn extract_texts(node: &Arc<topology::Node>, page: &Html) {
         .collect();
 }
 
-pub fn extract_images(node: &Arc<topology::Node>, page: &Html) {
-    let mut images = node.images.lock().unwrap();
-    *images = page
+pub fn extract_images(node: &Arc<Mutex<topology::Node>>, page: &Html) {
+    node.lock().unwrap().images = page
         .tree
         .values()
         .filter_map(|v| match v {
@@ -68,7 +68,7 @@ pub fn extract_images(node: &Arc<topology::Node>, page: &Html) {
                     if matches!(key.local, local_name!("src")) {
                         // TODO: add errors
                         // If the url is absolute, the value will replace the base url
-                        return Url::join(&node.url, value).ok();
+                        return Url::join(&node.lock().unwrap().url, value).ok();
                     }
                 }
                 None

@@ -1,20 +1,19 @@
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::cli;
 use crate::topology::Node;
 use colored::Colorize;
 use url::Url;
 
-// TODO : rewrite custom functions
-#[derive(PartialEq, Eq, Hash)]
 pub struct Config {
     pub cmd: cli::Commands,
     pub domain: String,
     pub bound: String,
     pub target_depth: i32,
     pub thread: u32,
-    pub root: Arc<Node>,
+    pub root: Arc<Mutex<Node>>,
+    pub target_external: i32,
 }
 
 impl Config {
@@ -37,11 +36,12 @@ impl Config {
             target_depth: args.depth,
             thread: args.task,
             root: Node::new_arc(None, origin_url, id),
+            target_external: args.external,
         })
     }
 
     pub fn same_domain(&self, url: &Url) -> bool {
-        url.domain().unwrap() == self.domain
+        url.domain().unwrap_or("") == self.domain
     }
 
     pub fn in_bound(&self, url: &Url) -> bool {
