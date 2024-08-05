@@ -1,32 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Directed Graph Visualization</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body,
-    html {
-      margin: 0;
-      padding: 0;
+  <title>Network Graph in JavaScript</title>
+  <style type="text/css">
+    html,
+    body {
       width: 100%;
       height: 100%;
+      margin: 0;
+      padding: 0;
       overflow: hidden;
     }
 
-    svg {
-      position: absolute;
-      top: 0;
-      left: 0;
+    #container {
       width: 100%;
       height: 100%;
+      position: relative;
+    }
+
+    #infoPanel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100%;
+      background-color: white;
+      border-left: 1px solid #ddd;
+      box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+      padding: 16px;
+      box-sizing: border-box;
+      display: none;
+      /* Hidden by default */
+      overflow-y: auto;
+    }
+
+    #infoPanel h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    #infoPanel p {
+      margin: 0;
+      color: #333;
     }
 
     .image-grid-container {
-      max-height: 200px; /* Set a max height for the container */
-      overflow-y: auto; /* Enable vertical scrolling if needed */
+      max-height: 200px;
+      /* Set a max height for the container */
+      overflow-y: auto;
+      /* Enable vertical scrolling if needed */
     }
 
     .image-grid {
@@ -38,158 +61,124 @@
     .image-grid img {
       width: 100%;
       height: auto;
+      display: block;
+    }
+
+    .comments-list {
+      margin: 10px 0;
+      padding: 0;
+      list-style-type: none;
+    }
+
+    .comments-list li {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
     }
   </style>
+  <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-core.min.js"></script>
+  <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-graph.min.js"></script>
 </head>
 
-<body class="bg-gray-100 dark:bg-gray-900">
-  <svg></svg>
-  <div
-    class="absolute top-4 right-4 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg dark:bg-gray-800 dark:border-gray-700">
-    <h2 class="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Node Details</h2>
-    <div id="node-details" class="text-gray-800 dark:text-gray-300">
-      <p>Click on a node to see more details.</p>
-    </div>
+<body>
+  <div id="container"></div>
+  <div id="infoPanel">
+    <h3>Node Info</h3>
+    <div id="infoContent"></div>
   </div>
-  <div
-    class="absolute top-4 left-4 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg dark:bg-gray-800 dark:border-gray-700">
-    <h2 class="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Settings</h2>
-    <label class="block mb-2 text-gray-900 dark:text-gray-100">
-      <input type="radio" name="linkType" value="unidirectional" checked class="mr-2"> Unidirectional Links
-    </label>
-    <label class="block text-gray-900 dark:text-gray-100">
-      <input type="radio" name="linkType" value="bidirectional" class="mr-2"> Bidirectional Links
-    </label>
-  </div>
-  <div class="absolute top-4 left-96 flex flex-col gap-2">
-    <button
-      class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-800"
-      id="zoom-in">Zoom In</button>
-    <button
-      class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-800"
-      id="zoom-out">Zoom Out</button>
-  </div>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const svg = d3.select('svg');
-      const zoom = d3.zoom().scaleExtent([0.5, 5]).on('zoom', (event) => {
-        svg.select('g').attr('transform', event.transform);
-      });
-      svg.call(zoom);
+    anychart.onDocumentReady(function () {
+      // Create data
+      const data = {{graph| json | safe}};
 
-      let linkType = 'unidirectional';
+      var chart = anychart.graph(data);
 
-      const data = {{graph| json | safe}}
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-
-      // Define arrow markers
-      svg.append('defs').selectAll('marker')
-        .data(['end'])
-        .enter().append('marker')
-        .attr('id', d => `arrow-${d}`)
-        .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 15)
-        .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('d', 'M0,-5L10,0L0,5')
-        .attr('class', 'link-arrow');
-
-      const g = svg.append('g');
-      const simulation = d3.forceSimulation(data.nodes)
-        .force('link', d3.forceLink(data.edges).id(d => d.id))
-        .force('charge', d3.forceManyBody())
-        .force('center', d3.forceCenter(width / 2, height / 2));
-
-      let link = g.append('g').attr('class', 'links')
-        .selectAll('line').data(data.edges)
-        .enter().append('line')
-        .attr('class', 'link')
-        .attr('stroke', '#999')  // Default stroke color
-        .attr('stroke-width', 1);  // Default stroke width
-
-      const node = g.append('g').attr('class', 'nodes')
-        .selectAll('g').data(data.nodes)
-        .enter().append('g');
-
-      node.append('circle').attr('class', 'node')
-        .attr('r', 5)
-        .attr('fill', 'grey')
-        .call(d3.drag()
-          .on('start', dragstarted)
-          .on('drag', dragged)
-          .on('end', dragended))
-        .on('mouseover', handleMouseOver)
-        .on('mouseout', handleMouseOut)
-        .on('click', handleClick);
-
-      node.append('text').attr('x', 8).attr('y', 3)
-        .text(d => d.label);
-
-      simulation.on('tick', () => {
-        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-          .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-        node.attr('transform', d => `translate(${d.x},${d.y})`);
+      var nodes = chart.nodes();
+      nodes.labels().enabled(true);
+      nodes.labels().fontSize(15);
+      nodes.labels().fontColor("black");
+      nodes.tooltip().useHtml(true);
+      nodes.tooltip().format(function (e) {
+        const name = e.getData("id");
+        const value = e.getData("value");
+        return `<b>${name}<br>${value}</b> km in diameter`;
       });
 
-      function updateLinks() {
-        link.attr('marker-end', linkType === 'unidirectional' ? 'url(#arrow-end)' : null);
-      }
-
-      document.querySelectorAll('input[name="linkType"]').forEach(input => {
-        input.addEventListener('change', () => {
-          linkType = document.querySelector('input[name="linkType"]:checked').value;
-          updateLinks();
-        });
+      var edges = chart.edges();
+      edges.tooltip().useHtml(true);
+      edges.tooltip().format(function (e) {
+        const from = e.getData("from");
+        const to = e.getData("to");
+        const distance = e.getData("distance") * 1000000;
+        return `From <b>${from}</b> to <b>${to}<br>${distance}</b> km`;
       });
+      edges.stroke("lightblue", 2, "10 5");
 
-      document.getElementById('zoom-in').addEventListener('click', () => svg.transition().duration(300).call(zoom.scaleBy, 1.5));
-      document.getElementById('zoom-out').addEventListener('click', () => svg.transition().duration(300).call(zoom.scaleBy, 0.5));
+      chart.title("Coma Network Graph");
+      chart.container("container");
+      chart.draw();
 
-      function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x; d.fy = d.y;
-      }
+      var infoPanel = document.getElementById("infoPanel");
+      var infoContent = document.getElementById("infoContent");
+      var lastClickedNode = null;
 
-      function dragged(event, d) {
-        d.fx = event.x; d.fy = event.y;
-      }
+      // Click event for nodes
+      chart.listen('click', function (e) {
 
-      function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null; d.fy = null;
-      }
-
-      function handleMouseOver(event, d) {
-        d3.select(this).select('circle').attr('r', 10);
-        link.filter(l => l.source.id === d.id || l.target.id === d.id)
-          .attr('stroke', 'red').attr('stroke-width', 2);
-      }
-
-      function handleMouseOut(event, d) {
-        d3.select(this).select('circle').attr('r', 5);
-        link.filter(l => l.source.id === d.id || l.target.id === d.id)
-          .attr('stroke', '#999').attr('stroke-width', 1);
-      }
-
-      function handleClick(event, d) {
-        const details = document.getElementById('node-details');
-        let imagesHtml = '';
-        if (d.images && d.images.length > 0) {
-          imagesHtml = '<div class="image-grid-container"><div class="image-grid">' + d.images.map(url => `<a href="${url}" target="_blank"><img src="${url}" alt="Image"></a>`).join('') + '</div></div>';
+        // Find id
+        var id = e.domTarget.tag?.id;
+        var node;
+        for (var n of data.nodes) {
+          if (n.id == id) {
+            node = n;
+            break;
+          }
         }
-        details.innerHTML = `
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">${d.label}</h3>
-          <p class="text-gray-800 dark:text-gray-300">ID: ${d.id}</p>
-          ${imagesHtml}
-        `;
-      }
+        if (!node) {
+          // Click on the blank area
+          infoPanel.style.display = "none";
+          return
+        }
 
-      updateLinks();
+        // Generate HTML for comments
+        let commentsHtml = '<ul class="comments-list">';
+        if (node.comments && node.comments.length > 0) {
+          node.comments.forEach(comment => {
+            commentsHtml += `<li>${comment}</li>`;
+          });
+        } else {
+          commentsHtml += '<li>No comments available</li>';
+        }
+        commentsHtml += '</ul>';
+
+        // Generate HTML for images
+        console.log(node.images)
+        let imagesHtml = '';
+        if (node.images && node.images.length > 0) {
+          imagesHtml = '<div class="image-grid-container"><div class="image-grid">';
+          node.images.forEach(url => {
+            imagesHtml += `<a href="${url}" target="_blank"><img src="${url}" alt="Image"></a>`;
+          });
+          imagesHtml += '</div></div>';
+        }
+
+        // Update the content of the info panel
+        infoContent.innerHTML = `<strong>ID:</strong> ${node.id}<br>` +
+          `<strong>Label:</strong> ${node.label}<br>` +
+          (node.images.length > 0 ? `<strong>Images:</strong>${imagesHtml}` : "") +
+            (node.comments.length > 0 ? `<strong>Comments:</strong>${commentsHtml}` : "");
+
+        // Show the info panel
+        infoPanel.style.display = "block";
+        lastClickedNode = node;
+      });
+
+      // Hide the info panel when clicking outside
+      document.addEventListener('click', function (e) {
+        if (infoPanel.style.display === "block" && !infoPanel.contains(e.target) && !e.target.closest('#container')) {
+          infoPanel.style.display = "none";
+        }
+      });
     });
   </script>
 </body>

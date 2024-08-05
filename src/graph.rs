@@ -45,8 +45,8 @@ impl GraphNode {
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 struct GraphEdge {
-    source: String,
-    target: String,
+    from: String,
+    to: String,
 }
 
 impl Graph {
@@ -71,8 +71,8 @@ impl Graph {
                 continue;
             }
             edges.insert(GraphEdge {
-                source: node.id.clone(),
-                target: child.lock().unwrap().id.clone(),
+                from: node.id.clone(),
+                to: child.lock().unwrap().id.clone(),
             });
             let graph = Graph::by_children(&child.lock().unwrap());
             nodes.extend(graph.nodes);
@@ -92,8 +92,8 @@ impl Graph {
                     unreachable!("Parent has not been explored") // debug purpose
                 }
                 edges.insert(GraphEdge {
-                    source: node.id.clone(),
-                    target: parent.lock().unwrap().id.clone(),
+                    from: node.id.clone(),
+                    to: parent.lock().unwrap().id.clone(),
                 });
                 let graph = Graph::by_parents(&parent.lock().unwrap());
                 nodes.extend(graph.nodes);
