@@ -75,6 +75,19 @@
       padding: 5px;
       border-bottom: 1px solid #ddd;
     }
+
+    .inputs-list {
+      margin: 10px 0;
+      padding: 0;
+      list-style-type: none;
+    }
+
+    .inputs-list li {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+    }
+
   </style>
   <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-core.min.js"></script>
   <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-graph.min.js"></script>
@@ -151,6 +164,16 @@
         }
         commentsHtml += '</ul>';
 
+        let inputsHtml = '<ul class="inputs-list">';
+        if (node.inputs && node.inputs.length > 0) {
+          node.inputs.forEach(input => {
+            inputsHtml += `<li>${input}</li>`;
+          });
+        } else {
+          inputsHtml += '<li>No inputs available</li>';
+        }
+        inputsHtml += '</ul>';
+
         // Generate HTML for images
         console.log(node.images)
         let imagesHtml = '';
@@ -166,7 +189,8 @@
         infoContent.innerHTML = `<strong>ID:</strong> ${node.id}<br>` +
           `<strong>Label:</strong> ${node.label}<br>` +
           (node.images.length > 0 ? `<strong>Images:</strong>${imagesHtml}` : "") +
-            (node.comments.length > 0 ? `<strong>Comments:</strong>${commentsHtml}` : "");
+          (node.comments.length > 0 ? `<strong>Comments:</strong>${commentsHtml}` : "") +
+          (node.inputs.length > 0 ? `<strong>Inputs:</strong>${inputsHtml}` : "");
 
         // Show the info panel
         infoPanel.style.display = "block";

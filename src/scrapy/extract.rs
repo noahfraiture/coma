@@ -37,7 +37,7 @@ pub fn extract_comments(node: &Arc<Mutex<topology::Node>>, page: &Html) {
         .tree
         .values()
         .filter_map(|v| match v {
-            scraper::Node::Comment(comment) => Some(comment.to_string()),
+            scraper::Node::Comment(comment) => Some(comment.to_string()).filter(|v| !v.is_empty()),
             _ => None,
         })
         .collect();
@@ -54,6 +54,7 @@ pub fn extract_texts(node: &Arc<Mutex<topology::Node>>, page: &Html) {
         .collect();
 }
 
+// TODO refactor to reduce duplicate code
 pub fn extract_images(node: &Arc<Mutex<topology::Node>>, page: &Html) {
     node.lock().unwrap().images = page
         .tree
@@ -69,6 +70,30 @@ pub fn extract_images(node: &Arc<Mutex<topology::Node>>, page: &Html) {
                         // TODO: add errors
                         // If the url is absolute, the value will replace the base url
                         return Url::join(&node.lock().unwrap().url, value).ok();
+                    }
+                }
+                None
+            }
+            _ => None,
+        })
+        .collect();
+}
+
+pub fn extract_input(node: &Arc<Mutex<topology::Node>>, page: &Html) {
+    node.lock().unwrap().inputs = page
+        .tree
+        .values()
+        .filter_map(|v| match v {
+            scraper::Node::Element(element) => {
+                let element = element.to_owned();
+                if !matches!(element.name.local, local_name!("input")) {
+                    return None;
+                }
+                for (key, value) in &element.attrs {
+                    // TODO: check if name is a mandatory attribute
+                    // Could replace by id if id is.
+                    if matches!(key.local, local_name!("name")) {
+                        return Some(value.to_string());
                     }
                 }
                 None

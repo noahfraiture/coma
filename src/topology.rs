@@ -19,6 +19,7 @@ pub struct Node {
     // Could try later to impl these trait
     pub comments: Vec<String>,
     pub texts: Vec<String>,
+    pub inputs: Vec<String>,
     pub children: Vec<Arc<Mutex<Node>>>,
     pub parents: Vec<Weak<Mutex<Node>>>,
 }
@@ -47,6 +48,7 @@ impl Node {
             images: Vec::new(),
             comments: Vec::new(),
             texts: Vec::new(),
+            inputs: Vec::new(),
             children: vec![],
             parents: parent.map_or_else(Vec::new, |p| vec![Arc::downgrade(p)]),
         }));
@@ -90,6 +92,12 @@ impl Node {
     pub fn handle_texts(&self) {
         for text in self.texts.iter() {
             println!("{}", text);
+        }
+    }
+
+    pub fn handle_inputs(&self) {
+        for input in self.inputs.iter() {
+            println!("{}", input);
         }
     }
 }

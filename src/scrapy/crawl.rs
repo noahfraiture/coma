@@ -62,6 +62,7 @@ impl Browser {
             }
             Commands::Images => {
                 extract::extract_images(parent, &document);
+                // TODO : mutex block with await. Not optimal and safe
                 parent.lock().unwrap().handle_images().await;
             }
             Commands::Links => {}
@@ -69,6 +70,11 @@ impl Browser {
                 extract::extract_texts(parent, &document);
                 extract::extract_comments(parent, &document);
                 extract::extract_images(parent, &document);
+                extract::extract_input(parent, &document);
+            }
+            Commands::Input => {
+                extract::extract_input(parent, &document);
+                parent.lock().unwrap().handle_inputs();
             }
         };
         links

@@ -30,6 +30,7 @@ struct GraphNode {
     label: String,
     images: Vec<String>,
     comments: Vec<String>,
+    inputs: Vec<String>,
 }
 
 impl GraphNode {
@@ -39,6 +40,7 @@ impl GraphNode {
             label: node.url.to_string(),
             images: node.images.iter().map(|url| url.to_string()).collect(),
             comments: node.comments.iter().map(|com| com.to_string()).collect(),
+            inputs: node.inputs.iter().map(|com| com.to_string()).collect(),
         }
     }
 }

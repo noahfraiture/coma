@@ -60,6 +60,9 @@ pub enum Commands {
 
     /// Extract all information and generate a topology
     Graph,
+
+    /// Extract informations about any form
+    Input,
 }
 
 pub enum ArgsError {
