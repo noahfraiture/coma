@@ -87,7 +87,6 @@
       padding: 5px;
       border-bottom: 1px solid #ddd;
     }
-
   </style>
   <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-core.min.js"></script>
   <script src="https://cdn.anychart.com/releases/8.12.1/js/anychart-graph.min.js"></script>
@@ -101,6 +100,16 @@
   </div>
   <script>
     anychart.onDocumentReady(function () {
+      // Function to escape HTML characters
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
       // Create data
       const data = {{graph| json | safe}};
 
@@ -157,7 +166,7 @@
         let commentsHtml = '<ul class="comments-list">';
         if (node.comments && node.comments.length > 0) {
           node.comments.forEach(comment => {
-            commentsHtml += `<li>${comment}</li>`;
+            commentsHtml += `<li>${escapeHtml(comment)}</li>`;
           });
         } else {
           commentsHtml += '<li>No comments available</li>';
@@ -167,7 +176,7 @@
         let inputsHtml = '<ul class="inputs-list">';
         if (node.inputs && node.inputs.length > 0) {
           node.inputs.forEach(input => {
-            inputsHtml += `<li>${input}</li>`;
+            inputsHtml += `<li>${escapeHtml(input)}</li>`;
           });
         } else {
           inputsHtml += '<li>No inputs available</li>';

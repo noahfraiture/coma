@@ -86,17 +86,11 @@ pub fn extract_input(node: &Arc<Mutex<topology::Node>>, page: &Html) {
         .filter_map(|v| match v {
             scraper::Node::Element(element) => {
                 let element = element.to_owned();
-                if !matches!(element.name.local, local_name!("input")) {
-                    return None;
+                if matches!(element.name.local, local_name!("input")) {
+                    Some(format!("{:?}", element))
+                } else {
+                    None
                 }
-                for (key, value) in &element.attrs {
-                    // TODO: check if name is a mandatory attribute
-                    // Could replace by id if id is.
-                    if matches!(key.local, local_name!("name")) {
-                        return Some(value.to_string());
-                    }
-                }
-                None
             }
             _ => None,
         })
