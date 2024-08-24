@@ -1,9 +1,7 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use headless_chrome::LaunchOptions;
 use std::{
     collections::HashSet,
-    fs::File,
-    io::{copy, Cursor},
     sync::{Arc, Mutex},
 };
 
@@ -11,20 +9,8 @@ use scraper::Html;
 use url::Url;
 
 use super::{extract, Browser, ScrapyError};
-use crate::cli::Commands;
+use crate::cli::Content;
 use crate::topology;
-
-pub async fn download_img(url: &Url) -> Result<()> {
-    println!("Download image");
-    let (_, file_name) = url.path().rsplit_once('/').context("error on split")?;
-    let response = reqwest::get(url.as_str()).await?;
-    let mut file = File::create(file_name)?;
-
-    // The file is a jpg or else
-    let mut content = Cursor::new(response.bytes().await?);
-    copy(&mut content, &mut file)?;
-    Ok(())
-}
 
 impl Browser {
     // These functions are used in async context
@@ -43,40 +29,40 @@ impl Browser {
         Ok(Self { browser, tab })
     }
 
+    // TODO : replace handle_... by the command and format
+    // Add format
     pub async fn parse_document(
         self,
-        cmd: Commands,
+        contents: &Vec<Content>,
         parent: &Arc<Mutex<topology::Node>>,
     ) -> HashSet<Url> {
         let response = self.tab.get_content().unwrap();
         let document = Html::parse_document(&response);
         let links = extract::extract_links(&parent.lock().unwrap().url, &document);
-        match cmd {
-            Commands::Texts => {
-                extract::extract_texts(parent, &document);
-                parent.lock().unwrap().handle_texts();
-            }
-            Commands::Comments => {
-                extract::extract_comments(parent, &document);
-                parent.lock().unwrap().handle_comments();
-            }
-            Commands::Images => {
-                extract::extract_images(parent, &document);
-                // TODO : mutex block with await. Not optimal and safe
-                parent.lock().unwrap().handle_images().await;
-            }
-            Commands::Links => {}
-            Commands::Graph => {
-                extract::extract_texts(parent, &document);
-                extract::extract_comments(parent, &document);
-                extract::extract_images(parent, &document);
-                extract::extract_input(parent, &document);
-            }
-            Commands::Input => {
-                extract::extract_input(parent, &document);
-                parent.lock().unwrap().handle_inputs();
-            }
-        };
+
+        for content in contents {
+            match content {
+                Content::Texts => {
+                    extract::extract_texts(parent, &document);
+                }
+                Content::Comments => {
+                    extract::extract_comments(parent, &document);
+                }
+                Content::Links => {}
+                Content::Images => {
+                    extract::extract_images(parent, &document);
+                }
+                Content::Input => {
+                    extract::extract_input(parent, &document);
+                }
+                Content::All => {
+                    extract::extract_texts(parent, &document);
+                    extract::extract_comments(parent, &document);
+                    extract::extract_images(parent, &document);
+                    extract::extract_input(parent, &document);
+                }
+            };
+        }
         links
     }
 }

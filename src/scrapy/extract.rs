@@ -9,6 +9,7 @@ use url::Url;
 
 use crate::topology;
 
+// TODO : add format
 pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
     HashSet::from_iter(page.tree.values().filter_map(|v| match v {
         scraper::Node::Element(element) => {

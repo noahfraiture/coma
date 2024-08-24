@@ -1,14 +1,11 @@
-use futures::future::join_all;
 use std::sync::{Arc, Mutex, Weak};
-use tokio::task;
 use url::Url;
-
-use crate::scrapy::crawl;
 
 pub struct Node {
     pub id: String,
     pub url: Url,
     // TODO : should I move while Node behind of mutex instead of most field ?
+    // TODO : I could use a color to show difference between explored and unexplored node
     pub explored: bool, // flag used to know if it will be rendered
     // Every node will own every images on the page
     // More logic that every node own a copy of the url to the image
@@ -63,41 +60,7 @@ impl Node {
         self.children.push(Arc::clone(child))
     }
 
-    pub fn explore(&mut self) {
-        self.explored = true;
-    }
-
     pub fn quantity_elements(&self) -> usize {
         self.images.len() + self.comments.len() + self.texts.len()
-    }
-
-    pub async fn handle_images(&self) {
-        let mut tasks = Vec::new();
-        for image in self.images.iter().map(|v| v.to_owned()) {
-            let task = task::spawn(async move {
-                // TODO return error
-                crawl::download_img(&image).await.unwrap();
-            });
-            tasks.push(task);
-        }
-        join_all(tasks).await;
-    }
-
-    pub fn handle_comments(&self) {
-        for comment in self.comments.iter() {
-            println!("{}", comment);
-        }
-    }
-
-    pub fn handle_texts(&self) {
-        for text in self.texts.iter() {
-            println!("{}", text);
-        }
-    }
-
-    pub fn handle_inputs(&self) {
-        for input in self.inputs.iter() {
-            println!("{}", input);
-        }
     }
 }

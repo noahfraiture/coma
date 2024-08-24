@@ -17,10 +17,17 @@ Version: {version}
 
 {usage-heading} {usage}
 {all-args} {tab}")]
-pub struct Args {
-    /// Informations extracted
+pub struct Cli {
+    /// Action to perform with the data
     #[command(subcommand)]
     pub cmd: Commands,
+
+    /// Content to scrap
+    #[arg(value_delimiter = ',', default_value = "all")]
+    pub content: Vec<Content>,
+
+    #[arg()]
+    pub format: Format,
 
     /// Url to start the search
     #[arg(short, long)]
@@ -43,9 +50,20 @@ pub struct Args {
     pub external: i32,
 }
 
-// TODO : add topology
-#[derive(Subcommand, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Commands {
+    /// Print the extracted content in the terminal
+    Print,
+
+    /// Save the extracted content in files
+    Save,
+
+    /// Create a html topolgy
+    Graph,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
+pub enum Content {
     /// Extract the text in the html
     Texts,
 
@@ -58,11 +76,20 @@ pub enum Commands {
     /// Extract the images of the page
     Images,
 
-    /// Extract all information and generate a topology
-    Graph,
-
     /// Extract informations about any form
     Input,
+
+    /// Extract all information and generate a topology
+    All,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone)]
+pub enum Format {
+    /// Create a json file with the data
+    Json,
+
+    /// Raw data
+    Raw,
 }
 
 pub enum ArgsError {
@@ -91,8 +118,8 @@ impl fmt::Debug for ArgsError {
 
 impl std::error::Error for ArgsError {}
 
-pub fn args() -> Result<Args, ArgsError> {
-    let args = Args::parse();
+pub fn args() -> Result<Cli, ArgsError> {
+    let args = Cli::parse();
 
     match Url::parse(&args.url) {
         Ok(v) => {

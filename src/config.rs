@@ -7,13 +7,9 @@ use colored::Colorize;
 use url::Url;
 
 pub struct Config {
-    pub cmd: cli::Commands,
     pub domain: String,
-    pub bound: String,
-    pub target_depth: i32,
-    pub thread: u32,
     pub root: Arc<Mutex<Node>>,
-    pub target_external: i32,
+    pub args: cli::Cli,
 }
 
 impl Config {
@@ -30,13 +26,9 @@ impl Config {
         let id = origin_url.clone().to_string();
 
         Ok(Config {
-            cmd: args.cmd,
             domain,
-            bound: args.bound,
-            target_depth: args.depth,
-            thread: args.task,
             root: Node::new_arc(None, origin_url, id),
-            target_external: args.external,
+            args,
         })
     }
 
@@ -45,7 +37,7 @@ impl Config {
     }
 
     pub fn in_bound(&self, url: &Url) -> bool {
-        url.as_str().contains(&self.bound)
+        url.as_str().contains(&self.args.bound)
     }
 }
 

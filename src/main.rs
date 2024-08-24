@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::scrapy::Browser;
-use cli::Commands;
 use colored::Colorize;
 use scrapy::ScrapyError;
 use tokio::{sync::Semaphore, task::JoinSet};
@@ -26,29 +25,30 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new()?;
     let mut state = State::new(Arc::clone(&config.root))?;
     println!("{:?}", config.root.lock().unwrap().url);
-    PERMITS.add_permits(config.thread as usize);
+    PERMITS.add_permits(config.args.task as usize);
     while state.pop_layer().is_some() {
         println!("=== Depth {} ===", state.current_depth);
 
         let mut handles = browse_layer(&mut state, &config).await?;
         collect(&mut state, &config, &mut handles).await?;
-        if state.current_depth == config.target_depth {
+        if state.current_depth == config.args.depth {
             break;
         }
         state.current_depth += 1;
         println!();
     }
 
-    if config.cmd == Commands::Graph {
-        graph::render(&config.root).await?;
-    }
+    // TODO : format data and build the response
+    // graph::render(&config.root).await?;
     Ok(())
 }
+
+type FuturesBrowse = JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>;
 
 async fn browse_layer(
     state: &mut State,
     config: &Config,
-) -> Result<JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>, Box<dyn std::error::Error>> {
+) -> Result<FuturesBrowse, Box<dyn std::error::Error>> {
     let mut handles = JoinSet::new();
     while let Some(node) = state.current_layer.pop() {
         if !config.same_domain(&node.lock().unwrap().url)
@@ -72,7 +72,7 @@ async fn browse_layer(
 async fn collect(
     state: &mut State,
     config: &Config,
-    handles: &mut JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>,
+    handles: &mut FuturesBrowse,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Collecting data from every url of the layer");
     let mut total_count = 0;
@@ -80,20 +80,20 @@ async fn collect(
         let (browser, parent) = handle?;
         let mut explore_external = false;
         let links = browser?
-            .parse_document(config.cmd, &parent)
+            .parse_document(&config.args.content, &parent)
             .await
             .into_iter()
             .filter(|link| {
                 if config.same_domain(link) {
                     return true;
                 }
-                if state.current_external < config.target_external {
+                if state.current_external < config.args.external {
                     explore_external = true;
                     return true;
                 }
                 false
             });
-        parent.lock().unwrap().explore();
+        parent.lock().unwrap().explored = true;
 
         let childs: Vec<Arc<Mutex<Node>>> = links
             .map(|url| Node::new_arc(Some(&parent), url.clone(), url.to_string()))
@@ -104,7 +104,7 @@ async fn collect(
     println!(
         "Found a total of {} {:?}",
         total_count.to_string().green(),
-        config.cmd
+        config.args.cmd
     );
     Ok(())
 }
