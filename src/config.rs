@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use crate::cli;
-use crate::topology::Node;
+use crate::node::Node;
 use colored::Colorize;
 use url::Url;
 

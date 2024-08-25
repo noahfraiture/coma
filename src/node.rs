@@ -11,14 +11,18 @@ pub struct Node {
     // More logic that every node own a copy of the url to the image
 
     // Mutex is need to borrow mutability of Arc
-    pub images: Vec<Url>,
+    pub images: Option<Vec<Url>>,
     // Can't directly use scraper::node::{Comment, Text} since their aren't Send/Sync
     // Could try later to impl these trait
-    pub comments: Vec<String>,
-    pub texts: Vec<String>,
-    pub inputs: Vec<String>,
+    pub comments: Option<Vec<String>>,
+    pub texts: Option<Vec<String>>,
+    pub inputs: Option<Vec<String>>,
+    pub links: Option<Vec<Url>>,
     pub children: Vec<Arc<Mutex<Node>>>,
     pub parents: Vec<Weak<Mutex<Node>>>,
+
+    // Output already formatted as wanted
+    pub output: Option<String>,
 }
 
 impl std::hash::Hash for Node {
@@ -42,12 +46,14 @@ impl Node {
             id,
             url,
             explored: false,
-            images: Vec::new(),
-            comments: Vec::new(),
-            texts: Vec::new(),
-            inputs: Vec::new(),
+            images: None,
+            comments: None,
+            texts: None,
+            inputs: None,
+            links: None,
             children: vec![],
             parents: parent.map_or_else(Vec::new, |p| vec![Arc::downgrade(p)]),
+            output: None,
         }));
         if let Some(parent) = parent {
             parent.lock().unwrap().add_child(&node);
@@ -55,12 +61,23 @@ impl Node {
         node
     }
 
-    // TODO : remove unwrap
+    pub fn explore(node: &Arc<Mutex<Node>>, func: fn(&Node)) {
+        func(&node.lock().unwrap());
+        for child in &node.lock().unwrap().children {
+            if !child.lock().unwrap().explored {
+                continue;
+            }
+            Node::explore(child, func);
+        }
+    }
+
     pub fn add_child(&mut self, child: &Arc<Mutex<Node>>) {
         self.children.push(Arc::clone(child))
     }
 
     pub fn quantity_elements(&self) -> usize {
-        self.images.len() + self.comments.len() + self.texts.len()
+        self.images.as_ref().unwrap_or(&vec![]).len()
+            + self.comments.as_ref().unwrap_or(&vec![]).len()
+            + self.texts.as_ref().unwrap_or(&vec![]).len()
     }
 }

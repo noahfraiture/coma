@@ -7,7 +7,7 @@ use markup5ever::local_name;
 use scraper::{node::Element, Html};
 use url::Url;
 
-use crate::topology;
+use crate::node;
 
 // TODO : add format
 pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
@@ -32,26 +32,30 @@ pub fn extract_links(url: &Url, page: &Html) -> HashSet<Url> {
     }))
 }
 
-pub fn extract_comments(node: &Arc<Mutex<topology::Node>>, page: &Html) {
-    node.lock().unwrap().comments = page
-        .tree
-        .values()
-        .filter_map(|v| match v {
-            scraper::Node::Comment(comment) => Some(comment.to_string()).filter(|v| !v.is_empty()),
-            _ => None,
-        })
-        .collect();
+pub fn extract_comments(node: &Arc<Mutex<node::Node>>, page: &Html) {
+    node.lock().unwrap().comments = Some(
+        page.tree
+            .values()
+            .filter_map(|v| match v {
+                scraper::Node::Comment(comment) => {
+                    Some(comment.to_string()).filter(|v| !v.is_empty())
+                }
+                _ => None,
+            })
+            .collect(),
+    );
 }
 
-pub fn extract_texts(node: &Arc<Mutex<topology::Node>>, page: &Html) {
-    node.lock().unwrap().texts = page
-        .tree
-        .values()
-        .filter_map(|v| match v {
-            scraper::Node::Text(text) => Some(text.to_string()),
-            _ => None,
-        })
-        .collect();
+pub fn extract_texts(node: &Arc<Mutex<node::Node>>, page: &Html) {
+    node.lock().unwrap().texts = Some(
+        page.tree
+            .values()
+            .filter_map(|v| match v {
+                scraper::Node::Text(text) => Some(text.to_string()),
+                _ => None,
+            })
+            .collect(),
+    );
 }
 
 pub fn extract_element<T, F>(page: &Html, filter: F) -> Vec<T>
@@ -70,8 +74,8 @@ where
         .collect()
 }
 
-pub fn extract_images(node: &Arc<Mutex<topology::Node>>, page: &Html) {
-    node.lock().unwrap().images = extract_element(page, |element: Element| {
+pub fn extract_images(node: &Arc<Mutex<node::Node>>, page: &Html) {
+    node.lock().unwrap().images = Some(extract_element(page, |element: Element| {
         if matches!(element.name.local, local_name!("img")) {
             for (key, value) in &element.attrs {
                 if matches!(key.local, local_name!("src")) {
@@ -81,16 +85,16 @@ pub fn extract_images(node: &Arc<Mutex<topology::Node>>, page: &Html) {
             }
         }
         None
-    });
+    }));
 }
 
 // TODO : better rendering
-pub fn extract_input(node: &Arc<Mutex<topology::Node>>, page: &Html) {
-    node.lock().unwrap().inputs = extract_element(page, |element: Element| {
+pub fn extract_input(node: &Arc<Mutex<node::Node>>, page: &Html) {
+    node.lock().unwrap().inputs = Some(extract_element(page, |element: Element| {
         if matches!(element.name.local, local_name!("input")) {
             Some(format!("{:?}", element))
         } else {
             None
         }
-    });
+    }));
 }

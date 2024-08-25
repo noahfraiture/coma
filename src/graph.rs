@@ -1,14 +1,13 @@
 use askama::Template;
-
 use colored::Colorize;
-
-use crate::topology::Node;
 use serde::Serialize;
 use std::{
     collections::HashSet,
     fmt, fs,
     sync::{Arc, Mutex},
 };
+
+use crate::node::Node;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -38,9 +37,15 @@ impl GraphNode {
         Self {
             id: node.id.clone(),
             label: node.url.to_string(),
-            images: node.images.iter().map(|url| url.to_string()).collect(),
-            comments: node.comments.iter().map(|com| com.to_string()).collect(),
-            inputs: node.inputs.iter().map(|com| com.to_string()).collect(),
+            images: node
+                .images
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|url| url.to_string())
+                .collect(),
+            comments: node.comments.as_deref().unwrap_or_default().to_vec(),
+            inputs: node.inputs.as_deref().unwrap_or_default().to_vec(),
         }
     }
 }
@@ -55,11 +60,8 @@ impl Graph {
     fn from_root(node: &Node) -> Self {
         let (mut nodes, mut edges) = (HashSet::<GraphNode>::new(), HashSet::<GraphEdge>::new());
         let graph_child = Graph::by_children(node);
-        let graph_parent = Graph::by_parents(node);
         nodes.extend(graph_child.nodes);
-        nodes.extend(graph_parent.nodes);
         edges.extend(graph_child.edges);
-        edges.extend(graph_parent.edges);
         Graph { nodes, edges }
     }
 
@@ -82,30 +84,10 @@ impl Graph {
         }
         Graph { nodes, edges }
     }
-
-    fn by_parents(node: &Node) -> Self {
-        let (mut nodes, mut edges) = (
-            HashSet::from([GraphNode::from_node(node)]),
-            HashSet::<GraphEdge>::new(),
-        );
-        for parent in node.parents.clone() {
-            if let Some(parent) = parent.upgrade() {
-                if !parent.lock().unwrap().explored {
-                    unreachable!("Parent has not been explored") // debug purpose
-                }
-                edges.insert(GraphEdge {
-                    from: node.id.clone(),
-                    to: parent.lock().unwrap().id.clone(),
-                });
-                let graph = Graph::by_parents(&parent.lock().unwrap());
-                nodes.extend(graph.nodes);
-                edges.extend(graph.edges);
-            }
-        }
-        Graph { nodes, edges }
-    }
 }
 
+// NOTE : we suppose we search from the root and thus we will never need to look at parents
+// If we want to support multiple root, we'll have to rethink this
 pub async fn render(root: &Arc<Mutex<Node>>) -> Result<(), GraphError> {
     let template = GraphTemplate {
         graph: Graph::from_root(&root.lock().unwrap()),

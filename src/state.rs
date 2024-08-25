@@ -1,4 +1,4 @@
-use crate::topology::Node;
+use crate::node::Node;
 use std::{
     collections::LinkedList,
     sync::{Arc, Mutex},

@@ -1,23 +1,24 @@
 use std::{
-    process,
+    error, process,
     sync::{Arc, Mutex},
 };
 
-use crate::scrapy::Browser;
 use colored::Colorize;
-use scrapy::ScrapyError;
 use tokio::{sync::Semaphore, task::JoinSet};
 
+mod browser;
 mod cli;
 mod config;
+mod extract;
+mod format;
 mod graph;
-mod scrapy;
+mod node;
 mod state;
-mod topology;
 
+use browser::Browser;
 use config::Config;
+use node::Node;
 use state::State;
-use topology::Node;
 
 static PERMITS: Semaphore = Semaphore::const_new(0);
 
@@ -30,7 +31,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!("=== Depth {} ===", state.current_depth);
 
         let mut handles = browse_layer(&mut state, &config).await?;
-        collect(&mut state, &config, &mut handles).await?;
+        let childs = parse_layer(&mut state, &config, &mut handles).await?;
+        state.add_to_next_layer(childs);
         if state.current_depth == config.args.depth {
             break;
         }
@@ -43,13 +45,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-type FuturesBrowse = JoinSet<(Result<Browser, ScrapyError>, Arc<Mutex<Node>>)>;
+type FuturesBrowse = JoinSet<(Result<Browser, browser::BrowseError>, Arc<Mutex<Node>>)>;
 
+// Browse the current layer and generate the chromium browser for the page
 async fn browse_layer(
     state: &mut State,
     config: &Config,
-) -> Result<FuturesBrowse, Box<dyn std::error::Error>> {
-    let mut handles = JoinSet::new();
+) -> Result<FuturesBrowse, Box<dyn error::Error>> {
+    let mut handles: FuturesBrowse = JoinSet::new();
     while let Some(node) = state.current_layer.pop() {
         if !config.same_domain(&node.lock().unwrap().url)
             || state.known(&node)
@@ -69,13 +72,15 @@ async fn browse_layer(
     Ok(handles)
 }
 
-async fn collect(
+// Parse every page of the layer and extract useful information
+async fn parse_layer(
     state: &mut State,
     config: &Config,
     handles: &mut FuturesBrowse,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Vec<Arc<Mutex<Node>>>, Box<dyn std::error::Error>> {
     println!("Collecting data from every url of the layer");
     let mut total_count = 0;
+    let mut next_layer_childs = Vec::new();
     while let Some(handle) = handles.join_next().await {
         let (browser, parent) = handle?;
         let mut explore_external = false;
@@ -95,18 +100,18 @@ async fn collect(
             });
         parent.lock().unwrap().explored = true;
 
-        let childs: Vec<Arc<Mutex<Node>>> = links
+        let mut childs: Vec<Arc<Mutex<Node>>> = links
             .map(|url| Node::new_arc(Some(&parent), url.clone(), url.to_string()))
             .collect();
         total_count += parent.lock().unwrap().quantity_elements() + childs.len();
-        state.add_to_next_layer(childs);
+        next_layer_childs.append(&mut childs);
     }
     println!(
         "Found a total of {} {:?}",
         total_count.to_string().green(),
         config.args.cmd
     );
-    Ok(())
+    Ok(next_layer_childs)
 }
 
 fn main() {

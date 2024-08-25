@@ -62,7 +62,7 @@ pub enum Commands {
     Graph,
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub enum Content {
     /// Extract the text in the html
     Texts,
@@ -77,7 +77,7 @@ pub enum Content {
     Images,
 
     /// Extract informations about any form
-    Input,
+    Inputs,
 
     /// Extract all information and generate a topology
     All,
@@ -88,7 +88,7 @@ pub enum Format {
     /// Create a json file with the data
     Json,
 
-    /// Raw data
+    /// Raw data. Link are not raw href but joined with domain
     Raw,
 }
 
