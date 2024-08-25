@@ -25,63 +25,52 @@ impl Node {
         contents: &Vec<Content>,
         f: &Format,
     ) -> std::result::Result<(), FormatError> {
-        let mut datas: Vec<String> = Vec::new();
-        for content in contents {
-            match content {
-                Content::Texts => datas.append(&mut self.format_texts(f)?),
-                Content::Comments => datas.append(&mut self.format_comments(f)?),
-                Content::Links => datas.append(&mut self.format_links(f)?),
-                Content::Images => datas.append(&mut self.format_images(f)?),
-                Content::Inputs => datas.append(&mut self.format_inputs(f)?),
-                Content::All => {
-                    datas.append(&mut self.format_texts(f)?);
-                    datas.append(&mut self.format_comments(f)?);
-                    datas.append(&mut self.format_links(f)?);
-                    datas.append(&mut self.format_images(f)?);
-                    datas.append(&mut self.format_inputs(f)?);
+        match f {
+            Format::Json => {
+                let mut datas: Vec<Data> = Vec::new();
+                for content in contents {
+                    datas.append(&mut self.format_json(content).ok_or(FormatError::None)?);
                 }
-            };
+                self.output = serde_json::to_string(&datas).ok();
+            }
+            Format::Raw => {
+                let mut datas: Vec<String> = Vec::new();
+                for content in contents {
+                    datas.append(&mut self.format_raw(content).ok_or(FormatError::None)?)
+                }
+                self.output = Some(datas.join("\n"));
+            }
         }
-        self.output = Some(match f {
-            Format::Json => serde_json::to_string(&datas)?,
-            Format::Raw => datas.join("\n"),
-        });
         Ok(())
     }
 
-    fn format_texts(&mut self, f: &Format) -> Result<Vec<String>, FormatError> {
-        match f {
-            Format::Json => Data::json(self.texts.take().unwrap(), Content::Texts),
-            Format::Raw => Ok(self.texts.take().unwrap()),
+    fn format_raw(&mut self, content: &Content) -> Option<Vec<String>> {
+        match content {
+            Content::Texts => self.texts.take(),
+            Content::Comments => self.comments.take(),
+            Content::Links => Some(urls_string(self.links.take()?)),
+            Content::Images => Some(urls_string(self.images.take()?)),
+            Content::Inputs => self.inputs.take(),
+            Content::All => todo!(),
         }
     }
-    fn format_comments(&mut self, f: &Format) -> Result<Vec<String>, FormatError> {
-        match f {
-            Format::Json => Data::json(self.comments.take().unwrap(), Content::Comments),
-            Format::Raw => Ok(self.comments.take().unwrap()),
-        }
-    }
-    fn format_links(&mut self, f: &Format) -> Result<Vec<String>, FormatError> {
-        match f {
-            Format::Json => Data::json(url_to_string(self.links.take().unwrap()), Content::Links),
-            Format::Raw => Ok(url_to_string(self.links.take().unwrap())),
-        }
-    }
-    fn format_images(&mut self, f: &Format) -> Result<Vec<String>, FormatError> {
-        match f {
-            Format::Json => Data::json(url_to_string(self.images.take().unwrap()), Content::Images),
-            Format::Raw => Ok(url_to_string(self.images.take().unwrap())),
-        }
-    }
-    fn format_inputs(&mut self, f: &Format) -> Result<Vec<String>, FormatError> {
-        match f {
-            Format::Json => Data::json(self.inputs.take().unwrap(), Content::Inputs),
-            Format::Raw => Ok(self.inputs.take().unwrap()),
+
+    fn format_json(&mut self, content: &Content) -> Option<Vec<Data>> {
+        match content {
+            Content::Texts => Some(Data::json(self.texts.take()?, Content::Texts)),
+            Content::Comments => Some(Data::json(self.comments.take()?, Content::Comments)),
+            Content::Links => Some(Data::json(urls_string(self.links.take()?), Content::Links)),
+            Content::Images => Some(Data::json(
+                urls_string(self.images.take()?),
+                Content::Images,
+            )),
+            Content::Inputs => Some(Data::json(self.inputs.take()?, Content::Inputs)),
+            Content::All => todo!(),
         }
     }
 }
 
-fn url_to_string(urls: Vec<Url>) -> Vec<String> {
+fn urls_string(urls: Vec<Url>) -> Vec<String> {
     urls.into_iter().map(|link| link.to_string()).collect()
 }
 
@@ -92,15 +81,14 @@ struct Data {
 }
 
 impl Data {
-    fn json(datas: Vec<String>, content: Content) -> Result<Vec<String>, FormatError> {
-        Ok(datas
+    fn json(datas: Vec<String>, content: Content) -> Vec<Data> {
+        datas
             .into_iter()
             .map(|data| Data {
                 r#type: content,
                 content: data,
             })
-            .map(|data| serde_json::to_string(&data))
-            .collect::<Result<Vec<String>, serde_json::Error>>()?)
+            .collect()
     }
 }
 
@@ -108,11 +96,14 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug)]
-struct FormatError(String);
+enum FormatError {
+    Serde(String),
+    None,
+}
 
 impl From<serde_json::Error> for FormatError {
     fn from(value: serde_json::Error) -> Self {
-        FormatError(value.to_string())
+        FormatError::Serde(value.to_string())
     }
 }
 
