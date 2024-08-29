@@ -61,14 +61,18 @@ impl Node {
         node
     }
 
-    pub fn explore(node: &Arc<Mutex<Node>>, func: fn(&Node)) {
-        func(&node.lock().unwrap());
+    pub fn explore(
+        node: &Arc<Mutex<Node>>,
+        func: Visitor,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        func(&mut node.lock().unwrap())?;
         for child in &node.lock().unwrap().children {
             if !child.lock().unwrap().explored {
                 continue;
             }
-            Node::explore(child, func);
+            Node::explore(child, func)?;
         }
+        Ok(())
     }
 
     pub fn add_child(&mut self, child: &Arc<Mutex<Node>>) {
@@ -81,3 +85,5 @@ impl Node {
             + self.texts.as_ref().unwrap_or(&vec![]).len()
     }
 }
+
+type Visitor<'a> = &'a mut dyn FnMut(&mut Node) -> Result<(), Box<dyn std::error::Error>>;

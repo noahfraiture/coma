@@ -1,11 +1,7 @@
 use askama::Template;
 use colored::Colorize;
 use serde::Serialize;
-use std::{
-    collections::HashSet,
-    fmt, fs,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashSet, fmt, fs};
 
 use crate::node::Node;
 
@@ -88,13 +84,13 @@ impl Graph {
 
 // NOTE : we suppose we search from the root and thus we will never need to look at parents
 // If we want to support multiple root, we'll have to rethink this
-pub async fn render(root: &Arc<Mutex<Node>>) -> Result<(), GraphError> {
+pub fn render(root: &Node) -> Result<(), GraphError> {
     let template = GraphTemplate {
-        graph: Graph::from_root(&root.lock().unwrap()),
+        graph: Graph::from_root(root),
     };
     let html = template.render().map_err(|e| GraphError(e.to_string()))?;
     let mut temp_file_path = std::env::temp_dir();
-    temp_file_path.push(root.lock().unwrap().url.domain().unwrap().to_owned() + ".html");
+    temp_file_path.push(root.url.domain().unwrap().to_owned() + ".html");
     fs::write(&temp_file_path, html).expect("Failed to write to named file");
     let temp_file_path_str = temp_file_path.to_str().expect("Failed to get file path");
     webbrowser::open(temp_file_path_str).expect("Failed to open in web browser");
