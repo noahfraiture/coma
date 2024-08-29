@@ -1,71 +1,89 @@
-use std::fs::File;
-use std::io::{copy, Cursor};
 use url::Url;
 
-use crate::cli::{Content, Format};
+use crate::cli::{Content, Display, Format};
 
 use super::node::Node;
 
-async fn download_img(url: &Url) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Download image");
-    let (_, file_name) = url.path().rsplit_once('/').unwrap();
-    let response = reqwest::get(url.as_str()).await?;
-    let mut file = File::create(file_name)?;
-
-    // The file is a jpg or else
-    let mut content = Cursor::new(response.bytes().await?);
-    copy(&mut content, &mut file)?;
-    Ok(())
-}
-
 impl Node {
-    // NOTE: we should never have an error since that means we haven't extract wanted data
-    fn format(
-        &mut self,
+    pub fn format(
+        node: &mut Node,
         contents: &Vec<Content>,
-        f: &Format,
+        cmd: &Display,
     ) -> std::result::Result<(), FormatError> {
-        match f {
-            Format::Json => {
-                let mut datas: Vec<Data> = Vec::new();
-                for content in contents {
-                    datas.append(&mut self.format_json(content).ok_or(FormatError::None)?);
-                }
-                self.output = serde_json::to_string(&datas).ok();
-            }
-            Format::Raw => {
-                let mut datas: Vec<String> = Vec::new();
-                for content in contents {
-                    datas.append(&mut self.format_raw(content).ok_or(FormatError::None)?)
-                }
-                self.output = Some(datas.join("\n"));
-            }
+        let format = match cmd {
+            Display::Print { format } | Display::Save { format, .. } => format,
+            _ => return Err(FormatError::Graph),
+        };
+
+        match format {
+            Format::Json => Node::aggregate_json(node, contents),
+            Format::Raw => Node::aggregate_raw(node, contents),
         }
+    }
+
+    fn aggregate_json(
+        node: &mut Node,
+        contents: &Vec<Content>,
+    ) -> std::result::Result<(), FormatError> {
+        let mut datas: Vec<Data> = Vec::new();
+        for content in contents {
+            datas.append(&mut Self::format_json(node, content));
+        }
+        node.output = serde_json::to_string(&datas).ok();
         Ok(())
     }
 
-    fn format_raw(&mut self, content: &Content) -> Option<Vec<String>> {
+    fn aggregate_raw(
+        node: &mut Node,
+        contents: &Vec<Content>,
+    ) -> std::result::Result<(), FormatError> {
+        let mut datas: Vec<String> = Vec::new();
+        for content in contents {
+            datas.append(&mut Self::format_raw(node, content))
+        }
+        node.output = Some(datas.join("\n"));
+        Ok(())
+    }
+
+    fn format_raw(node: &mut Node, content: &Content) -> Vec<String> {
         match content {
-            Content::Texts => self.texts.take(),
-            Content::Comments => self.comments.take(),
-            Content::Links => Some(urls_string(self.links.take()?)),
-            Content::Images => Some(urls_string(self.images.take()?)),
-            Content::Inputs => self.inputs.take(),
-            Content::All => todo!(),
+            Content::Texts => node.texts.take().unwrap(),
+            Content::Comments => node.comments.take().unwrap(),
+            Content::Links => urls_string(node.links.take().unwrap()),
+            Content::Images => urls_string(node.images.take().unwrap()),
+            Content::Inputs => node.inputs.take().unwrap(),
+            Content::All => vec![
+                node.texts.take().unwrap(),
+                node.comments.take().unwrap(),
+                urls_string(node.links.take().unwrap()),
+                urls_string(node.images.take().unwrap()),
+                node.inputs.take().unwrap(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
         }
     }
 
-    fn format_json(&mut self, content: &Content) -> Option<Vec<Data>> {
+    fn format_json(node: &mut Node, content: &Content) -> Vec<Data> {
         match content {
-            Content::Texts => Some(Data::json(self.texts.take()?, Content::Texts)),
-            Content::Comments => Some(Data::json(self.comments.take()?, Content::Comments)),
-            Content::Links => Some(Data::json(urls_string(self.links.take()?), Content::Links)),
-            Content::Images => Some(Data::json(
-                urls_string(self.images.take()?),
-                Content::Images,
-            )),
-            Content::Inputs => Some(Data::json(self.inputs.take()?, Content::Inputs)),
-            Content::All => todo!(),
+            Content::Texts => Data::json(node.texts.take().unwrap(), Content::Texts),
+            Content::Comments => Data::json(node.comments.take().unwrap(), Content::Comments),
+            Content::Links => Data::json(urls_string(node.links.take().unwrap()), Content::Links),
+            Content::Images => {
+                Data::json(urls_string(node.images.take().unwrap()), Content::Images)
+            }
+            Content::Inputs => Data::json(node.inputs.take().unwrap(), Content::Inputs),
+            Content::All => vec![
+                Data::json(node.texts.take().unwrap(), Content::Texts),
+                Data::json(node.comments.take().unwrap(), Content::Comments),
+                Data::json(urls_string(node.links.take().unwrap()), Content::Links),
+                Data::json(urls_string(node.images.take().unwrap()), Content::Images),
+                Data::json(node.inputs.take().unwrap(), Content::Inputs),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
         }
     }
 }
@@ -96,14 +114,14 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug)]
-enum FormatError {
-    Serde(String),
-    None,
+pub enum FormatError {
+    Serde,
+    Graph,
 }
 
 impl From<serde_json::Error> for FormatError {
-    fn from(value: serde_json::Error) -> Self {
-        FormatError::Serde(value.to_string())
+    fn from(_: serde_json::Error) -> Self {
+        FormatError::Serde
     }
 }
 

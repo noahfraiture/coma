@@ -20,14 +20,11 @@ Version: {version}
 pub struct Cli {
     /// Action to perform with the data
     #[command(subcommand)]
-    pub cmd: Commands,
+    pub cmd: Display,
 
     /// Content to scrap
-    #[arg(value_delimiter = ',', default_value = "all")]
+    #[arg(short, long, value_delimiter = ',', default_value = "all")]
     pub content: Vec<Content>,
-
-    #[arg()]
-    pub format: Format,
 
     /// Url to start the search
     #[arg(short, long)]
@@ -38,6 +35,7 @@ pub struct Cli {
     pub depth: i32,
 
     /// Upper bound in the url, any url that doesn't contains this string will be ignored
+    // TODO : change default to Option<String>
     #[arg(short, long, default_value = "")]
     pub bound: String,
 
@@ -51,12 +49,24 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Commands {
+pub enum Display {
     /// Print the extracted content in the terminal
-    Print,
+    Print {
+        /// Format of the output
+        #[arg()]
+        format: Format,
+    },
 
     /// Save the extracted content in files
-    Save,
+    Save {
+        /// Format of the output
+        #[arg()]
+        format: Format,
+
+        /// Name of the output file
+        #[arg(short, long, default_value = "output")]
+        name: String,
+    },
 
     /// Create a html topolgy
     Graph,
@@ -83,7 +93,7 @@ pub enum Content {
     All,
 }
 
-#[derive(clap::ValueEnum, Debug, Clone)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Format {
     /// Create a json file with the data
     Json,

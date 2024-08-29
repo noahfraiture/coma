@@ -9,6 +9,7 @@ use tokio::{sync::Semaphore, task::JoinSet};
 mod browser;
 mod cli;
 mod config;
+mod display;
 mod extract;
 mod format;
 mod graph;
@@ -23,26 +24,41 @@ use state::State;
 static PERMITS: Semaphore = Semaphore::const_new(0);
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::new()?;
-    let mut state = State::new(Arc::clone(&config.root))?;
-    println!("{:?}", config.root.lock().unwrap().url);
-    PERMITS.add_permits(config.args.task as usize);
+    let conf = Config::new()?;
+    let mut state = State::new(Arc::clone(&conf.root))?;
+    println!("Crawling");
+    PERMITS.add_permits(conf.args.task as usize);
     while state.pop_layer().is_some() {
         println!("=== Depth {} ===", state.current_depth);
 
-        let mut handles = browse_layer(&mut state, &config).await?;
-        let childs = parse_layer(&mut state, &config, &mut handles).await?;
+        let mut handles = browse_layer(&mut state, &conf).await?;
+        let childs = parse_layer(&mut state, &conf, &mut handles).await?;
         state.add_to_next_layer(childs);
-        if state.current_depth == config.args.depth {
+        if state.current_depth == conf.args.depth {
             break;
         }
         state.current_depth += 1;
         println!();
     }
 
-    // TODO : format data and build the response
-    // graph::render(&config.root).await?;
+    println!("Formatting");
+    format(&conf)?;
+
+    println!("Displaying");
+    display(&conf)?;
     Ok(())
+}
+
+fn format(conf: &Config) -> Result<(), Box<dyn std::error::Error>> {
+    let mut format = |node: &mut Node| {
+        Node::format(node, &conf.args.content, &conf.args.cmd).map_err(Into::into)
+    }; // Need to convert FormatError to Box< ...
+    Node::explore(&conf.root, &mut format)
+}
+
+fn display(conf: &Config) -> Result<(), Box<dyn std::error::Error>> {
+    let mut display = |node: &mut Node| Node::display(node, &conf.args.cmd).map_err(Into::into);
+    Node::explore(&conf.root, &mut display)
 }
 
 type FuturesBrowse = JoinSet<(Result<Browser, browser::BrowseError>, Arc<Mutex<Node>>)>;
@@ -73,6 +89,7 @@ async fn browse_layer(
 }
 
 // Parse every page of the layer and extract useful information
+// TODO: refactor that shit
 async fn parse_layer(
     state: &mut State,
     config: &Config,
@@ -84,20 +101,22 @@ async fn parse_layer(
     while let Some(handle) = handles.join_next().await {
         let (browser, parent) = handle?;
         let mut explore_external = false;
-        let links = browser?
-            .parse_document(&config.args.content, &parent)
-            .await
-            .into_iter()
-            .filter(|link| {
-                if config.same_domain(link) {
-                    return true;
-                }
-                if state.current_external < config.args.external {
+        let links = browser?.parse_document(&config.args.content, &parent).await;
+
+        let links = links.into_iter().filter_map(|link| {
+            if config.same_domain(&link) {
+                Some(link)
+            } else if state.current_external < config.args.external {
+                if !explore_external {
                     explore_external = true;
-                    return true;
+                    state.current_external += 1;
                 }
-                false
-            });
+                Some(link)
+            } else {
+                None
+            }
+        });
+
         parent.lock().unwrap().explored = true;
 
         let mut childs: Vec<Arc<Mutex<Node>>> = links
@@ -117,7 +136,7 @@ async fn parse_layer(
 fn main() {
     if let Ok(rt) = tokio::runtime::Runtime::new() {
         if let Err(e) = rt.block_on(run()) {
-            eprintln!("{:?}", e);
+            eprintln!("error {:?}", e);
             process::exit(1);
         }
         return;

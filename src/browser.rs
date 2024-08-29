@@ -70,6 +70,7 @@ impl Browser {
                 Content::All => {
                     extract::extract_texts(node, &document);
                     extract::extract_comments(node, &document);
+                    node.lock().unwrap().links = Some(links.clone().into_iter().collect());
                     extract::extract_images(node, &document);
                     extract::extract_input(node, &document);
                 }
