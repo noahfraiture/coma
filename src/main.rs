@@ -27,7 +27,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let conf = Config::new()?;
     let mut state = State::new(Arc::clone(&conf.root))?;
     println!("Crawling");
-    PERMITS.add_permits(conf.args.task as usize);
+    PERMITS.add_permits(conf.args.thread as usize);
     while state.pop_layer().is_some() {
         println!("=== Depth {} ===", state.current_depth);
 

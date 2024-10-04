@@ -39,9 +39,9 @@ pub struct Cli {
     #[arg(short, long, default_value = "")]
     pub bound: String,
 
-    /// Max number of concurrent task
+    /// Max number of concurrent thread
     #[arg(short, long, default_value_t = 5)]
-    pub task: u32,
+    pub thread: u32,
 
     // Depth to external website with different domain. Depth have priority to stop the search
     #[arg(short, long, default_value_t = 0)]
